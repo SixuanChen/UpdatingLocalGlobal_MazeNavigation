@@ -1,0 +1,1410 @@
+%\documentclass[a4paper]{article}
+
+\documentclass[hidelinks,man]{apa7}
+
+\pdfoutput=1
+
+\usepackage{alltt}
+\usepackage{natbib}
+
+\usepackage{float}
+
+\floatplacement{figure}{htbp}
+
+\usepackage{placeins}
+
+
+\let\Oldsection\subsection
+\renewcommand{\subsection}{\FloatBarrier\Oldsection}
+
+\let\Oldsubsection\subsubsection
+\renewcommand{\subsubsection}{\FloatBarrier\Oldsubsection}
+
+\let\Oldsubsubsection\subsubsection
+\renewcommand{\subsubsection}{\FloatBarrier\Oldsubsubsection}
+
+
+\usepackage{mathptmx}      
+
+\usepackage[]{graphicx}
+\usepackage[]{color}
+%\usepackage[margin=25mm]{geometry}
+%\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+%adding this for line counting
+\usepackage{lineno}
+\linenumbers
+
+ % adding this to remove section numbering
+ %\setcounter{secnumdepth}{0}
+ 
+%
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\begin{document}
+
+%adding this to prevent huge spaces between paragraphs
+\raggedbottom
+
+
+\title{Updating Local and Global Probability Events During Maze Navigation}
+\shorttitle{Maze}
+
+%removed for double blind peer review
+
+% \author{Authorship and affiliation hidden for masked review}
+
+% 
+% \iffalse
+\author{Sixuan Chen, Britt Anderson}
+\affiliation{Centre for Theoretical Neuroscience, Department of Psychology, University of Waterloo}
+
+
+\authornote{
+   \addORCIDlink{Sixuan Chen}{0000-0002-6343-2092}
+
+  Correspondence concerning this article should be addressed to Sixuan Chen, Department of Psychology, University of Waterloo, E-mail: s743chen@uwaterloo.ca.This experiment is not preregistered. Source code, analysis, and data for the experiment is freely available online at \url{https://github.com/SixuanChen/UpdatingLocalGlobal_MazeNavigation}.
+}
+
+\maketitle
+
+
+\begin{abstract}
+
+We investigated whether people can encode local and global uncertainty in a navigation task. 
+Participants navigated a virtual maze where the location of the walls were obscured, but for which we provided local cues and a global direction.
+The validities of the global and local cues were separately and jointly varied across three experiments.  
+Participants' choices showed their ability to use both global and local cues to facilitate their navigation, but relied more heavily on the local cues, and were more precise in estimating the reliability of the local cues. We conclude that the uncertainty for events nearby in time or space can be represented independently of uncertainty representations for goals distant in time or space, and that people rely on both forms of information in guiding their decision-making.
+
+  
+\bigskip
+\begin{footnotesize}
+  \noindent \textbf{Keywords:} Maze Navigation, Uncertainty, Mental Representations
+\end{footnotesize}
+
+
+  
+\end{abstract}
+
+\newpage
+
+
+<<setup, include = FALSE, echo = FALSE>>=
+
+#This is to make numerical output in 2 decimal places by default.
+#Code adopted from http://www.jason-french.com/blog/2014/04/25/formatting-sweave-and-knitr-output-for-2-digits/
+
+
+library(knitr)
+inline_hook <- function (x) {
+    if (is.numeric(x)) {
+    # ifelse does a vectorized comparison
+    # If integer, print without decimal; otherwise print two places
+        res <- ifelse(x == round(x),
+                      sprintf("%d", x),
+                      sprintf("%.2f", x)
+    )
+        paste(res, collapse = ", ")
+    } else {
+        paste(x, collapse = ", ")
+  }
+  
+}
+knit_hooks$set(inline = inline_hook)
+
+
+
+
+# Here I'm writing a function to help format pvalues nicely.
+require('magrittr')
+formatp <- function(x) {
+    x <- as.numeric(x)
+    if (x < 0.001) {
+        p <- " $<$ .001"
+    } 
+    else if (x==1){
+       p <- " $=$ 1"
+      
+    }
+    else {
+        p <- sprintf("%.3f", x) %>%
+            gsub(".*\\.", "\\.", .) %>%
+            paste0(" = ", .)
+    }
+    return(p)
+}
+
+
+
+knitr::opts_chunk$set(
+                      out.height = '0.87\\textheight', out.width = '\\textwidth', out.extra = 'keepaspectratio'
+                  )
+
+knitr::opts_chunk$set(warning = FALSE)
+
+@ 
+
+
+
+
+<<readInDat, include = FALSE, cache = FALSE>>=
+
+set.seed(161)
+# 
+# load("publicPlinkoData.dat")
+require('data.table')
+require('pracma')
+require('plyr')
+require('magrittr')
+require('ggpubr')
+
+
+@ 
+
+<<getdata,echo =FALSE,warning = FALSE, message = FALSE>>=
+
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(tidyverse)
+library(rstatix)
+library(moments)
+library(car)
+library(lsr)
+library(ez)
+library(ggpubr)
+library(reshape2)
+library(extrafont)
+
+
+setwd("./")
+mycsv=dir()
+dP<-read.csv("WholeResultsP.csv")
+sonaid_total_P <- unique(dP$SONAID)
+
+
+FemaleSet_P = subset(dP, Gender == "F")
+Female_total_P <- unique(FemaleSet_P$SONAID)
+
+MaleSet_P = subset(dP, Gender == "M")
+Male_total_P <- unique(MaleSet_P$SONAID)
+
+RightHand_P = subset(dP, Handness == "R")
+RightHandSet_P <- unique(RightHand_P$SONAID)
+
+LeftHand_P = subset(dP, Handness == "L")
+LeftHandSet_P <- unique(LeftHand_P$SONAID)
+
+
+dVGFL<-read.csv("WholeResultsVGFL.csv")
+
+dVGFL =subset(dVGFL, PracticeOrNot == 0)
+sonaid_total_VGFL <- unique(dVGFL$SONAID)
+
+lengthSonaid_VGFL<- length(sonaid_total_VGFL)
+
+priorLocal_total_VGFL <- unique(dVGFL$Prior_Local)
+
+lengthLocal_VGFL<- length(priorLocal_total_VGFL)
+
+priorGlobal_total_VGFL <- unique(dVGFL$Prior_Global)
+
+lengthGloba_VGFLl<- length(priorGlobal_total_VGFL)
+
+
+priorLocal_VGFL <-  dVGFL[2,"Prior_Local"]
+priorGlobal_VGFL <-  dVGFL[2,"Prior_Global"]
+
+Maze_total_VGFL <- unique(dVGFL$Maze)
+
+
+HLSet_VGFL = subset(dVGFL, Global_Condition == "HL")
+HL_total_VGFL <- unique(HLSet_VGFL$SONAID)
+
+LHSet_VGFL = subset(dVGFL, Global_Condition == "LH")
+LH_total_VGFL <- unique(LHSet_VGFL$SONAID)
+
+FemaleSet_VGFL = subset(dVGFL, Gender == "F")
+Female_total_VGFL <- unique(FemaleSet_VGFL$SONAID)
+
+MaleSet_VGFL = subset(dVGFL, Gender == "M")
+Male_total_VGFL <- unique(MaleSet_VGFL$SONAID)
+
+RightHand_VGFL = subset(dVGFL, Handness == "R")
+RightHandSet_VGFL <- unique(RightHand_VGFL$SONAID)
+
+LeftHand_VGFL = subset(dVGFL, Handness == "L")
+LeftHandSet_VGFL <- unique(LeftHand_VGFL$SONAID)
+
+
+dFGVL<-read.csv("WholeResultsFGVL.csv")
+#d = subset(d, Condition == "LH")
+#d = subset(d, Condition == "LH")
+
+dFGVL =subset(dFGVL, PracticeOrNot == 0)
+dFGVL =subset(dFGVL, Trial <= 15)
+
+
+sonaid_total_FGVL <- unique(dFGVL$SONAID)
+
+lengthSonaid_FGVL<- length(sonaid_total_FGVL)
+
+priorLocal_total_FGVL <- unique(dFGVL$Prior_Local)
+
+lengthLocal_FGVL<- length(priorLocal_total_FGVL)
+
+priorLocal_FGVL <-  dFGVL[2,"Prior_Local"]
+priorGlobal_FGVL <-  dFGVL[2,"Prior_Global"]
+
+Maze_total_FGVL <- unique(dFGVL$Maze)
+
+
+HLSet_FGVL = subset(dFGVL, Condition == "HL")
+HL_total_FGVL <- unique(HLSet_FGVL$SONAID)
+
+LHSet_FGVL = subset(dFGVL, Condition == "LH")
+LH_total_FGVL <- unique(LHSet_FGVL$SONAID)
+
+FemaleSet_FGVL = subset(dFGVL, Gender == "F")
+Female_total_FGVL <- unique(FemaleSet_FGVL$SONAID)
+
+MaleSet_FGVL = subset(dFGVL, Gender == "M")
+Male_total_FGVL <- unique(MaleSet_FGVL$SONAID)
+
+RightHand_FGVL = subset(dFGVL, Handness == "R")
+RightHandSet_FGVL <- unique(RightHand_FGVL$SONAID)
+
+LeftHand_FGVL = subset(dFGVL, Handness == "L")
+LeftHandSet_FGVL <- unique(LeftHand_FGVL$SONAID)
+
+MedianAge_FGVL <- median(dFGVL$Age,na.rm= TRUE)
+
+
+test_DV<-function(data1,data2,correct){
+  test_data = t.test(data1,data2,paired=T) 
+  if (correct ==TRUE){
+    test_data$p.value<- p.adjust( test_data$p.value,'bonferroni',5)
+    return  (test_data$p.value)
+  }
+  else{
+     return (test_data$p.value)
+  }
+ 
+}
+
+@
+
+\section{Introduction}
+\label{intro}
+
+Building useful mental representations of the environment is crucial for our daily life.
+As we navigate our dynamic and complex world we pursue long term goals a step at a time.
+That is, we make local decisions in the service of longer term objectives. 
+One solution to finding the goal efficiently is to first encode sensory information into mental representations, then build rich causal models, and at last use them as guidance \citep{stachenfeld2017hippocampus,bottini2020knowledge}.
+There is a converging body of neuroscience research suggesting that the brain learns predictive maps of relational knowledge from sensory information and uses them for fast and adaptable decision-making  \citep{brunec2022predictive}. 
+These abstract representations can be considered as basis sets for describing relational knowledge \citep{behrens2018cognitive,bellmund2018navigating}. 
+However, deploying these representations requires that we deal with uncertainty at multiple scales.
+The cues we rely on to generate our next step may be only partly reliable, and may, in some cases, seem to require a detour from what we believe to be the shortest route to our goal.
+But we may be uncertain too about that goal direction.
+The current study aimed to explore how our mental representation may encode uncertainties in a dynamic environment where information on different scales may align or contradict each other. 
+
+In this study, we created a maze navigation experiment where participants' decisions could be guided by local cues or a global goal both of which could be uncertain.
+Further, the environment was dynamic and cue validities varied during navigation.
+We operationalized \emph{local} probability as the uncertainty related to events that were physically or temporally proximate and whose feedback was immediate and direct; \emph{global} probability was the uncertainty related to events that were associated with the general objective and required a sequence of actions where feedback was distant in space and time. 
+
+In structuring our study into how people weight or combine different sources of uncertainty we chose maze navigation \citep{deuker2016event,ho2022people,brunec2022predictive}. 
+Maze navigation provides participants with a clear goal and their progress is immediately accessible from the visual stimulus. 
+Second, solving mazes is complex enough such that each instance of a maze contains decision-making points from particular compositions of individual elements (for example, the wall, the exit location, and the cue). 
+Although those components can be easily accessed by participants, they still need to choose which elements to integrate into an effective mental representation. 
+Scant research has examined human's subjective estimates of local and global probabilities and their decision making in an environment involving uncertain local events and global events.
+\citet{arjona2018influence} administered a visuo-auditory version of the central cue Posner's paradigm and found local probability (sequential effects) had more Event-Related Potential (ERP) modulation than global probability(the setting for a block of trials) and/or their interaction.
+
+
+Two relatively unexplored questions are: How precisely can people encode local uncertainty and global uncertainty? Do people give more weight to local uncertain events to decide their actions? Through the use of a maze navigation game, this paper demonstrated participants had distinct and precise mental representations of uncertain global and local cues, and they relied on both local and global cues but local cues dominate when making decisions in maze navigation.
+
+\section{Methods}
+
+\subsection{General Participants Information}
+
+Participants for all experiments were undergraduates at the University of Waterloo who participated for course credit. 195 participants signed up for the experiments, and 92 completed all trials (the reasons given for dropping out early were length and monotony). 
+Five participants were removed because they either misunderstood the task or were not attentive. 
+They rated as 0\% a condition that was in fact 100\% on at least 14 of 15 trials. This left us with 88 participants in total. 
+
+All participants gave informed consent before completing the experiment that had ethics clearance from the Office of Research Ethics at the University of Waterloo (ORE \#43113).
+
+\subsection{General Procedures}
+
+Maze structures were generated using custom software written in Python and implementing a Growing Tree algorithm \citep{buck2015mazes}.
+The display of the maze and the interface were written in HTML and JavaScript. 
+Analyses were done using Python \citep{python3} and Rstudio \citep{rstudio} in the R statistical analysis environment \citep{Rcode} with packages ggplot2 \citep{ggplot2}, ggpubr \citep{ggpubr}, plotly \citep{plotly}, moments \citep{moments}, dplyr \citep{dplyr}, tidyverse \citep{tidyverse}, rstatix \citep{rstatix}, car \citep{car}, ez \citep{ez}, and reshape2 \citep{reshape2}.
+
+Each of our three experiments took about 30 minutes to finish and followed the same basic procedure. 
+Following a general outline of the features common to all experimental versions, we briefly described the distinct manipulations of each particular experiment. 
+We used the words local and global to indicate either the cues available for each directional choices in the maze (local) or to indicate the exit location (global).
+
+Participants were started at a fixed point in the maze (the start) for all mazes (see Figure \ref{fig:maze}). 
+The wall structure of the mazes was hidden from the participants by a gray mask. 
+Participants could only see blue and red colored circles indicating the available directions for movement. 
+Particular colors probabilistically provided local information as to the shortest path to the exit (blue in this experiment).
+We subsequently refer to this cue reliability as local probability information.The ground truth prior local probability is the cue validity that we manipulated as one independent variable. 
+Across trials, the exit location could change (global event), and could be similarly unreliable.
+We refer to this goal consistency as global probability. The ground truth prior global probability is the goal validity that we also manipulated as another independent variable. 
+Because the maze walls were invisible to participants, they had to rely on these local cues, their memory of the path traveled, and any ideas about the exit location to successfully navigate the maze.
+
+\begin{figure}
+\includegraphics[width=0.9\textwidth]{experiment_maze.png}
+\centering
+\caption{Overview of Maze experiment design. A: A typical maze without the gray mask. The shortest path is labeled in blue. The player is the green square and was always started at the top left. The hidden walls are labeled in black. B: A typical maze along with the colored local cues, and with the walls hidden by a gray mask. The mask is partially transparent for demonstration purposes. C: A typical maze as participants saw it in the experiment.}
+ \label{fig:maze}
+\end{figure}
+
+Before the experiment, participants were instructed to find the exit using as few steps as possible \textbf{and} to provide estimates of local and global probabilities. 
+Local probability was how trustworthy the local cues were in pointing to the shortest path direction within a maze, and the global probability was how likely the exit would be in a particular location across all mazes within a series of mazes. 
+We also provided various forms of feedback (that differed for individual experiments) to help participants know when they were on the right track.
+
+At the beginning of the experiment, participants were given some practice to familiarize themselves with the interface, how to move in the maze, and how to use the sliders to report their reliability estimates. 
+Source code, analysis, data, and demo for the task is freely available online at \url{https://github.com/SixuanChen/UpdatingLocalGlobal_MazeNavigation}.
+
+
+
+After finishing the whole experiment, participants were invited to report strategies and give any additional comments via a post-experiment questionnaire. 
+
+
+\subsection{Data Screening}
+For participants' behavior analysis, only participants' first visits to each decision-making point were considered (some participants would backtrack and face the same decision-making point more than once). 
+This filtration enabled data analysis to be unaffected by participants' behavior after receiving feedback on whether the last movement led to the shortest path or not. 
+Moreover, only participants' first 30 steps in every maze navigation were included in the behavior analysis. 
+This was because the maximum length of the shortest path was 22 and we did not want to include trials that might reflect distraction, misunderstanding, or fatigue.
+
+\section{Pilot Experiment}
+\subsection{Participants}
+
+\Sexpr{length(sonaid_total_P)} participants (Female = \Sexpr{length(Female_total_P)}, Male = \Sexpr{length(Male_total_P)}, Right hand-dominant= \Sexpr{length(RightHandSet_P)}, Left hand-dominant = \Sexpr{length(LeftHandSet_P)}) were enrolled in the pilot experiment. 
+
+\subsection{Procedure}
+
+In the pilot experiment, participants volunteered for the online study and were directed to a website to complete the informed consent.
+If they consented, they were forwarded to a new web page that provided the structured practice moves.
+Next, they were placed at the start of a new maze and instructed to locate the exit.
+They moved within the maze by using the arrow keys on their computer and adjusted the sliders by clicking and dragging with their mouse or equivalent (trackpad, touch screen; as this was an online study, we could not enforce a single response method but relied on whatever hardware participants used to run their web browser.
+We specifically asked participants not to complete the task using smartphones or tablets).
+After each selected move, the caption below the maze would demonstrate whether they were closer to or further away from the exit.
+When they reached the exit, they were informed of their success and a new maze would start. There were 10 mazes per participant, and 20 moves was the typical minimum number of moves for an individual maze. 
+
+
+Participants were informed that the exits were located at the bottom right 100\% of the time. 
+In addition, at each decision point of the maze navigation there were colored circles indicating possible directions to move.
+Specifically, blue-colored circles (local cues) indicated the direction that was the shortest path to the exit.
+Red-colored circles (of which there might be more than one) were also present at decision points. The cue color was the local cue. 
+For the first ten trials of this pilot experiment the local cue was 60\% valid.
+After familiarizing themselves with the interface participants completed 10 trials of randomly generated mazes.
+Each trial contained one maze with 9 * 9 cells.
+As participants navigated the mazes they could read the distance from the exit to their current location
+This was displayed at the bottom of the frame, below the maze. 
+In later experiments we eliminated the reporting of the explicit number of steps to the exit.
+Instead we only provided participants with general feedback ("You are closer to the exit." or "You are further away from the exit").
+
+\subsection{Results}
+
+The pilot experiment was done to refine the experimental instructions and to verify appropriate actions in the online environment. Thus, no analyses are reported.
+
+
+\section{Varied Global Fixed Local Experiment}
+
+\subsection{Participants}
+In the Varied Global Fixed Local experiment, a different population of \Sexpr{length(sonaid_total_VGFL)} participants (Female = \Sexpr{length(Female_total_VGFL)}, Male = \Sexpr{length(Male_total_VGFL)}, Right hand-dominant= \Sexpr{length(RightHandSet_VGFL)}, Left hand-dominant = \Sexpr{length(LeftHandSet_VGFL)}) were analyzed.
+<<Subjective Estimate VGFL,echo =FALSE>>=
+
+dVGFL<-read.csv("WholeResultsVGFL.csv")
+ 
+dVGFL =subset(dVGFL, PracticeOrNot == 0)
+sonaid_total_VGFL <- unique(dVGFL$SONAID)
+lengthSonaid_VGFL<- length(sonaid_total_VGFL)
+@
+\subsection{Procedure}
+
+In the Varied Global Fixed Local experiment (see Figure \ref{fig:VGFL}), after one practice trial, participants needed to finish three blocks of maze navigation with each block containing 15 mazes.
+Each maze had 11 * 11 cells.
+The distance from the exit was \textbf{not} displayed, but participants were told whether they were closer or farther away (fewer steps) from the exit after each movement.
+
+Every maze had a fixed ground truth prior local probability (cue validity) of 80\% but different ground truth prior global probabilities (goal validity); the proportion of the times the exit was in a particular corner within one block).
+The order of different global probability conditions was counterbalanced across participants.
+In the low to high global probability condition, the global probabilities were 60\%, 73\%, 80\%, while in the high to low global probability condition, the global probabilities were 80\%, 73\%, 60\%.
+\Sexpr{ length(LH_total_VGFL)} participants finished the low to high local probability condition, and \Sexpr{length(HL_total_VGFL)} participants finished the high to low local probability condition.
+Participants were asked to make their best subjective estimates of both global and local probabilities. Those estimates were recorded using sliders.
+After each maze navigation, participants would receive feedback about whether the final global or local probability estimates deviated more than ± 5\% from the ground truth.
+Since 5\% was far larger than their average variance in estimating local or global probability (1.5\%, 2.0\%) we were not worried about participants receiving extra information to update their estimates.
+\begin{figure}[h]
+\includegraphics[width=0.9\textwidth]{VGFL.png}
+\centering
+\caption{Overview of the Varied Global Fixed Local Experiment Design. A: A typical maze with a start point on top left and an exit at top right. B: A typical maze with a start point on top left and an exit at the bottom left.}
+ \label{fig:VGFL}
+\end{figure}
+
+
+\subsection{Results}
+
+Participant performance was measured using both subjective and objective reports. One example of a subjective response is the records of participants' estimates of the local probability using a provided "slider". An example of an objective response was the participant's choices for which direction to move in the maze. We used these reports to first confirm that participants understood the task and were generally competent, and then we performed additional analyses comparing how subjective estimates and objective choices changed under different combinations of local probability and global probability.
+
+<<Processed_VGFL_data,echo =FALSE>>=
+addGlobalProbabilityColumn <- function (df) {
+  df$GlobalEstimate<- c(df$Global_Probability[2:length(df$Global_Probability)],NA)
+  return(df)
+}
+
+addLocalProbabilityColumn <- function (df) {
+  df$LocalEstimate<- c(df$Local_Probability[2:length(df$Local_Probability)],NA)
+  return(df)
+}
+prosessVGFLData<- function(d,sonaid_total){
+lengthSonaid<- length(sonaid_total)
+dd2<-c()
+  for (i in 1:lengthSonaid) {
+
+    curr_id = sonaid_total[i]
+    curr_set = subset(d, SONAID ==curr_id)
+    curr_set =addGlobalProbabilityColumn(curr_set)
+    curr_set =addLocalProbabilityColumn(curr_set)
+    dd2 = rbind(dd2,curr_set)
+
+  }
+
+  return(dd2)
+}
+dd_VGFL= prosessVGFLData(dVGFL,sonaid_total_VGFL)
+
+
+@
+
+
+\subsubsection{Participants' Subjective Estimates of Local Probability and Global Probability}
+
+Participants could adjust their estimates of local probability and global probability using the sliders whenever they wanted.
+Given the heterogeneous timing of updating events, we only consider participants' final estimates at the end of each maze navigation as their estimate for that trial. We used the average of a participant’s local probability and global probability estimates within each blocks as the principle dependent variable. 
+First we report the participants' average subjective local probability estimates.
+
+<<VGFL Subjective Estimate of Local Probability,echo =FALSE>>=
+#select the estimate at end of the maze
+pro_data1_VGFL = subset(dd_VGFL, Distance ==0 )
+
+VGFL_Local_Global_Estimate= pro_data1_VGFL[,c("SONAID","Prior_Global","Prior_Local","GlobalEstimate","LocalEstimate","Steps")]
+
+
+VGFL_Local_Global_Estimate <- VGFL_Local_Global_Estimate[complete.cases(VGFL_Local_Global_Estimate),]
+
+VGFL_Local_Global_Estimate$Prior_Local<-strtoi(VGFL_Local_Global_Estimate$Prior_Local)
+VGFL_Local_Estimate_aggregate<- aggregate(cbind(LocalEstimate)~ SONAID + Prior_Local+ Prior_Global, VGFL_Local_Global_Estimate, base::mean)
+
+xlab = "Global: Ground Truth (%) "
+ylab = "Local: Slider Estimate (%)"
+header = "Average Participant Local Probability Estimate"
+
+BoxplotLocalEstimate_VGFL<- ggplot(VGFL_Local_Estimate_aggregate, aes(x = as.factor(Prior_Global), y = LocalEstimate, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Global),fill=as.factor(Prior_Global)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Global(%)")
+
+
+VGFL_Global_Estimate_aggregate$Prior_Global <- as.factor(VGFL_Global_Estimate_aggregate$Prior_Global)
+VGFL_Local_Estimate_aggregate$Prior_Global <- as.factor(VGFL_Local_Estimate_aggregate$Prior_Global)
+
+
+VGFL_Local_aggregate_60 = subset(VGFL_Local_Estimate_aggregate, Prior_Global ==60)
+VGFL_Local_aggregate_73 = subset(VGFL_Local_Estimate_aggregate, Prior_Global ==73)
+VGFL_Local_aggregate_80 = subset(VGFL_Local_Estimate_aggregate, Prior_Global ==80)
+
+# single factor within-subjects ANOVA
+
+VGFL_LE.aov <-ezANOVA(data=VGFL_Local_Estimate_aggregate,dv=.(LocalEstimate),wid=.(SONAID),within=.(Prior_Global),type=3)
+
+
+SEM_min_VGFL_LE= min(c(sd(VGFL_Local_aggregate_60$LocalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Local_aggregate_73$LocalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Local_aggregate_80$LocalEstimate)/sqrt(lengthSonaid_VGFL)))
+
+SEM_max_VGFL_LE= max(c(sd(VGFL_Local_aggregate_60$LocalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Local_aggregate_73$LocalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Local_aggregate_80$LocalEstimate)/sqrt(lengthSonaid_VGFL)))
+
+
+@
+
+The single factor within-subjects ANOVA showed that there were no influences of global probability on participants' estimates of the local probability (F(\Sexpr{(VGFL_LE.aov$ANOVA['DFn'])}, \Sexpr{(VGFL_LE.aov$ANOVA['DFd'])}) = \Sexpr{round(VGFL_LE.aov$ANOVA['F'],3)}, p \Sexpr{formatp(VGFL_LE.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(VGFL_LE.aov$ANOVA['ges'],3)}$).
+Participants' local probability estimates was similar in the blocks with global probability 60\% (M = \Sexpr{round(mean(VGFL_Local_aggregate_60$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(VGFL_Local_aggregate_60$LocalEstimate),2)}\%, SEM = \Sexpr{round(sd(VGFL_Local_aggregate_60$LocalEstimate)/sqrt(lengthSonaid_VGFL),2)}\%),  73\% (M = \Sexpr{round(mean(VGFL_Local_aggregate_73$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(VGFL_Local_aggregate_73$LocalEstimate),2)}\%, SEM = \Sexpr{round(sd(VGFL_Local_aggregate_73$LocalEstimate)/sqrt(lengthSonaid_VGFL),2)}\%), and  80\% (M = $\Sexpr{round(mean(VGFL_Local_aggregate_80$LocalEstimate),2)}$\%, SD = \Sexpr{round(sd(VGFL_Local_aggregate_80$LocalEstimate),2)}\%, SEM = \Sexpr{round(sd(VGFL_Local_aggregate_80$LocalEstimate)/sqrt(lengthSonaid_VGFL),2)}\%).  The standard error of the mean (SEM) of participants' subjective estimates of local probability remained similar across different global probabilities, between \Sexpr{round(SEM_min_VGFL_LE,2)}\% and \Sexpr{round(SEM_max_VGFL_LE,2)}\% (see Figure \ref{fig:VGFL_LE})
+
+<<VGFL_LE, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "The change in ground truth global probabilities did not impact participants’ subjective estimate of local probability in the Varied Global Fixed Local experiment. Different colors represent participants’ estimates of local probability under different ground truth prior global probabilities. Each black dot corresponds to one participant’s average estimate of local probability given one ground truth prior global probability condition. The black line connects one participant’s estimates of local probability across all ground truth prior local probabilities.">>=
+BoxplotLocalEstimate_VGFL
+@
+
+<<VGFL Subjective Estimate of Global Probability,echo =FALSE>>=
+xlab = "Global: Ground Truth (%) "
+ylab = "Global: Slider Estimate (%)"
+header = "Average Participant's Global Probability Estimate "
+
+
+
+ VGFL_Local_Global_Estimate$Prior_Global<-strtoi(VGFL_Local_Global_Estimate$Prior_Global)
+
+ VGFL_Global_Estimate_aggregate <- aggregate(cbind(GlobalEstimate)~ SONAID + Prior_Local+ Prior_Global, VGFL_Local_Global_Estimate, base::mean)
+
+ BoxplotGlobalEstimate_VGFL <- ggplot(VGFL_Global_Estimate_aggregate, aes(x = as.factor(Prior_Global), y =GlobalEstimate, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Global),fill=as.factor(Prior_Global)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Global(%)")
+
+ VGFL_GE.aov <-ezANOVA(data=VGFL_Global_Estimate_aggregate,dv=.(GlobalEstimate),wid=.(SONAID),within=.(Prior_Global),type=3)
+ VGFL_Global_aggregate_60 = subset(VGFL_Global_Estimate_aggregate, Prior_Global ==60)
+ VGFL_Global_aggregate_73 = subset(VGFL_Global_Estimate_aggregate, Prior_Global ==73)
+ VGFL_Global_aggregate_80 = subset(VGFL_Global_Estimate_aggregate, Prior_Global ==80)
+
+ SEM_min_VGFL_GE= min(c(sd(VGFL_Global_aggregate_60$GlobalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Global_aggregate_73$GlobalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Global_aggregate_80$GlobalEstimate)/sqrt(lengthSonaid_VGFL)))
+
+ SEM_max_VGFL_GE= max(c(sd(VGFL_Global_aggregate_60$GlobalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Global_aggregate_73$GlobalEstimate)/sqrt(lengthSonaid_VGFL),sd(VGFL_Global_aggregate_80$GlobalEstimate)/sqrt(lengthSonaid_VGFL)))
+
+@
+
+Next, we analyzed participants' subjective global probability estimates.
+% We checked the sphericity for participants' global estimates, the Mauchly’s test showed there was no violation of the assumption, (p \Sexpr{formatp (VGFL_LE.aov$`Mauchly's Test for Sphericity`[3])}). 
+The single factor within-subjects ANOVA showed participants' global estimates in the three blocks were significantly influenced by that block's global probability (F(\Sexpr{(VGFL_GE.aov$ANOVA['DFn'])}, \Sexpr{(VGFL_GE.aov$ANOVA['DFd'])}) = \Sexpr{round(VGFL_GE.aov$ANOVA['F'],3)}, p \Sexpr{formatp(VGFL_GE.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(VGFL_GE.aov$ANOVA['ges'],3)}$).
+
+<<Post-hoc VGFL Subjective Estimate ,echo =FALSE>>=
+ #post hoc
+ VGFL_Global_aggregate_60_73 =t.test(VGFL_Global_aggregate_73$GlobalEstimate,VGFL_Global_aggregate_60$GlobalEstimate,paired=T)
+ VGFL_Global_aggregate_60_80 =t.test(VGFL_Global_aggregate_60$GlobalEstimate,VGFL_Global_aggregate_80$GlobalEstimate,paired=T)
+ VGFL_Global_aggregate_73_80 =t.test(VGFL_Global_aggregate_73$GlobalEstimate,VGFL_Global_aggregate_80$GlobalEstimate,paired=T)
+
+ VGFL_Global_Estimate_pvalues<-c(VGFL_Global_aggregate_60_73$p.value,VGFL_Global_aggregate_60_80$p.value,VGFL_Global_aggregate_73_80$p.value)
+#
+ #not more then 3 levels no bonferroni
+ VGFL_Global_Estimate_pvalues<-p.adjust(VGFL_Global_Estimate_pvalues,'bonferroni',3)
+
+@
+
+Post-hoc paired t-tests revealed that participants' global probability estimates in the block with a ground truth prior global probability of 60\% (M = $\Sexpr{round(mean(VGFL_Global_aggregate_60$GlobalEstimate),2)}$\%, SD = \Sexpr{round(sd(VGFL_Global_aggregate_60$GlobalEstimate),2)}\%, SEM = \Sexpr{round(sd(VGFL_Global_aggregate_60$GlobalEstimate)/sqrt(lengthSonaid_VGFL),2)}\%) was significantly lower than participants' global probability  estimates in the block with a ground truth prior global probability of 73\% (M = \Sexpr{round(mean(VGFL_Global_aggregate_73$GlobalEstimate),2)}\%, SD = \Sexpr{round(sd(VGFL_Global_aggregate_73$GlobalEstimate),2)}\%, SEM = \Sexpr{round(sd(VGFL_Global_aggregate_73$GlobalEstimate)/sqrt(lengthSonaid_VGFL),2)}\%, p \Sexpr{formatp(VGFL_Global_Estimate_pvalues[1])}) but not for 80\% (M = \Sexpr{round(mean(VGFL_Global_aggregate_80$GlobalEstimate),2)}, SD = \Sexpr{round(sd(VGFL_Global_aggregate_80$GlobalEstimate),2)}, SEM = \Sexpr{round(sd(VGFL_Global_aggregate_80$GlobalEstimate)/sqrt(lengthSonaid_VGFL),2)}, p \Sexpr{formatp(VGFL_Global_Estimate_pvalues[2])}). The SEM of participants' subjective estimates of global probability remained similar across different prior global probabilities, between \Sexpr{round(SEM_min_VGFL_GE,2)}\% and \Sexpr{round(SEM_max_VGFL_GE,2)}\%.
+(see Figure \ref{fig:VGFL_GE})
+
+
+<<VGFL_GE, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Increasing ground truth prior global probability led to higher subjective estimates of global probability in the Varied Global Fixed Local experiment. Different colors represent participants'  subjective estimates of global probability under different global probability conditions. Each black dot corresponds to one participant's average subjective estimates of global probability one ground truth prior global probability condition. The black line connects one participant's average subjective estimates of global probability across all ground truth prior local probabilities.">>=
+BoxplotGlobalEstimate_VGFL
+@
+
+<<Objective_Behavior_VGFL,echo =FALSE>>=
+dVGFL_pro<-read.csv("WholeTurnbackResults_VGFL.csv")
+sonaid_total_VGFL <- unique(dVGFL_pro$SONAID)
+lengthSonaid_VGFL<- length(sonaid_total_VGFL)
+
+dVGFL_pro =subset(dVGFL_pro, PracticeOrNot == 0)
+#$Prior_Global<-strtoi(dVGFL_pro$Prior_Global)
+dVGFL_pro$Prior_Global <- as.factor(dVGFL_pro$Prior_Global)
+
+@
+
+
+\subsubsection{Objective Measure: Proportion of Choices Following the Shortest Path Direction}
+
+<<single factor within-subjects ANOVA _correct_VGFL,echo =FALSE>>=
+
+xlab = "Global: Ground Truth (%) "
+ylab = "Proportion of Choices\nFollowing the Shortest Path Direction"
+header = "Average Proportion of Choices Following the Shortest Path Direction"
+
+VGFL_Correct_aggregate <- aggregate(cbind(Player_Correct)~ SONAID + Prior_Local+ Prior_Global, dVGFL_pro, base::mean)
+
+VGFL_Correct_aggregate$Prior_Global <- as.factor(VGFL_Correct_aggregate$Prior_Global)
+BoxplotCorrect_VGFL <- ggplot(VGFL_Correct_aggregate, aes(x = as.factor(Prior_Global), y =Player_Correct, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Global),fill=as.factor(Prior_Global)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Global(%)")
+
+
+VGFL_Correct_aggregate$Prior_Global <- as.factor(VGFL_Correct_aggregate$Prior_Global)
+
+VGFL_Correct.aov <- ezANOVA(data=VGFL_Correct_aggregate,dv=.(Player_Correct),wid=.(SONAID),within=.(Prior_Global),type=3)
+
+@
+
+
+% The Mauchly’s test showed there was no departure from sphericity (p \Sexpr{formatp (VGFL_Correct.aov$`Mauchly's Test for Sphericity`[3])}). 
+We use participants'  proportions of choices following of the shortest path direction as an objective measure for their overall performance quality because their goal was to use the minimum number of steps to find the exit. 
+The participants' proportions of choices following the shortest path direction was significantly influenced by the ground truth prior global probability (F(\Sexpr{(VGFL_Correct.aov$ANOVA['DFn'])}, \Sexpr{(VGFL_Correct.aov$ANOVA['DFd'])}) = \Sexpr{round(VGFL_Correct.aov$ANOVA['F'],3)}, p \Sexpr{formatp(VGFL_Correct.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(VGFL_Correct.aov$ANOVA['ges'],3)}$).
+
+<<Post-hoc single factor within-subjects ANOVA _correct_VGFL,echo =FALSE>>=
+
+VGFL_Correct_aggregate_60 = subset( VGFL_Correct_aggregate, Prior_Global ==60 )
+VGFL_Correct_aggregate_73 = subset( VGFL_Correct_aggregate, Prior_Global ==73 )
+VGFL_Correct_aggregate_80 = subset( VGFL_Correct_aggregate, Prior_Global ==80 )
+
+SEM_min_VGFL_C= min(c(sd(VGFL_Correct_aggregate_60$Player_Correct)/sqrt(lengthSonaid_VGFL),sd(VGFL_Correct_aggregate_73$Player_Correct)/sqrt(lengthSonaid_VGFL),sd(VGFL_Correct_aggregate_80$Player_Correct)/sqrt(lengthSonaid_VGFL)))
+
+SEM_max_VGFL_C= max(c(sd(VGFL_Correct_aggregate_60$Player_Correct)/sqrt(lengthSonaid_VGFL),sd(VGFL_Correct_aggregate_73$Player_Correct)/sqrt(lengthSonaid_VGFL),sd(VGFL_Correct_aggregate_80$Player_Correct)/sqrt(lengthSonaid_VGFL)))
+
+
+VGFL_Correct_aggregate_60_73 =t.test(VGFL_Correct_aggregate_73$Player_Correct,VGFL_Correct_aggregate_60$Player_Correct,paired=T)
+VGFL_Correct_aggregate_60_80 =t.test(VGFL_Correct_aggregate_60$Player_Correct,VGFL_Correct_aggregate_80$Player_Correct,paired=T)
+VGFL_Correct_aggregate_73_80 =t.test(VGFL_Correct_aggregate_73$Player_Correct,VGFL_Correct_aggregate_80$Player_Correct,paired=T)
+
+VGFL_Correct_pvalues<-c(VGFL_Correct_aggregate_60_73$p.value,VGFL_Correct_aggregate_60_80$p.value,VGFL_Correct_aggregate_73_80$p.value)
+
+@
+
+The effect of ground truth prior global probability was marginal. Post-hoc paired t-tests demonstrated that participants' proportions of choices following the shortest path direction increased only as the ground truth prior global probability increased from 60\% (M = \Sexpr{round(mean(VGFL_Correct_aggregate_60$Player_Correct),2)}, SD = \Sexpr{round(sd(VGFL_Correct_aggregate_60$Player_Correct),2)}, SEM = \Sexpr{round(sd(VGFL_Correct_aggregate_60$Player_Correct)/sqrt(lengthSonaid_VGFL),2)}) to 73\% conditions (M = \Sexpr{round(mean(VGFL_Correct_aggregate_73$Player_Correct),2)}, SD = \Sexpr{round(sd(VGFL_Correct_aggregate_73$Player_Correct),2)}, SEM = \Sexpr{round(sd(VGFL_Correct_aggregate_73$Player_Correct)/sqrt(lengthSonaid_VGFL),2)}, p \Sexpr{formatp(VGFL_Correct_pvalues[1])}). 
+The SEM of participants' subjective estimates of local probability remained similar across different ground truth prior global probability levels, between \Sexpr{round(SEM_min_VGFL_C,2)} and \Sexpr{round(SEM_max_VGFL_C,2)} (see Figure \ref{fig:Correct_VGFL}) This indicates that participants were using the global direction as one guidance, but maybe not as much as they used local cues.
+
+
+<<Correct_VGFL, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Increasing ground truth prior global probability led to higher participants' proportions of choices following of the shortest path direction at the decision-making point in the Varied Global Fixed Local experiment. Average participants' proportions of choices following of the shortest path direction proportions were higher than chance in all global probability blocks. Different colors represent participants' proportions of choices following the shortest path direction under different global probability. Each black dot corresponds to one participant's average proportion of choices following the shortest path direction given one ground truth prior global probability condition. The black line connects one participant's proportion of choices following the shortest path direction across all ground truth prior global probabilities.">>=
+BoxplotCorrect_VGFL
+@
+
+\subsubsection{Objective Measure: Proportion of Choices Following Local Cues}
+
+<<single factor within-subjects ANOVA _blue_VGFL,echo =FALSE>>=
+xlab = "Global: Ground Truth (%) "
+ylab = "Proportion of Choices\nFollowing Local Cue"
+header = "Average Proportion of Choices Following Local Cues"
+VGFL_Local_Cue_aggregate <- aggregate(cbind(Player_Blue)~ SONAID + Prior_Local+ Prior_Global, dVGFL_pro, base::mean)
+Boxplot_Local_Cue_VGFL <- ggplot(VGFL_Local_Cue_aggregate, aes(x = as.factor(Prior_Global), y =Player_Blue, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Global),fill=as.factor(Prior_Global)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Global(%)")
+
+VGFL_Local_Cue_aggregate$Prior_Global <- as.factor(VGFL_Local_Cue_aggregate$Prior_Global)
+
+# single factor within-subjects ANOVA
+VGFL_Local_Cue.aov <- ezANOVA(data=VGFL_Local_Cue_aggregate,dv=.(Player_Blue),wid=.(SONAID),within=.(Prior_Global),type=3)
+
+VGFL_Local_Cue_aggregate_60 = subset( VGFL_Local_Cue_aggregate , Prior_Global ==60 )
+VGFL_Local_Cue_aggregate_73 = subset( VGFL_Local_Cue_aggregate , Prior_Global ==73 )
+VGFL_Local_Cue_aggregate_80 = subset( VGFL_Local_Cue_aggregate , Prior_Global ==80 )
+
+@
+
+The ground truth prior local probability was not changed during the whole experiment. If participants had a separate local probability representation from the changing global probability representation, they would be expected to rely on the local cues consistently without too much change.
+As hypothesized, the proportion of choices following local cues was not impacted by the ground truth prior global probability of that trial (F(\Sexpr{(VGFL_Local_Cue.aov$ANOVA['DFn'])}, \Sexpr{(VGFL_Local_Cue.aov$ANOVA['DFd'])}) = \Sexpr{round(VGFL_Local_Cue.aov$ANOVA['F'],3)}, p \Sexpr{formatp(VGFL_Local_Cue.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(VGFL_Local_Cue.aov$ANOVA['ges'],3)}$).
+Therefore no logistic regression was performed (see Figure \ref{fig:Blue_VGFL}).
+
+
+<<Blue_VGFL, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Increasing ground truth prior global probability did not lead to a difference in following local cues in the Varied Global Fixed Local experiment. Still, the average proportion of choices following local cues was higher than chance. Different colors represent participants' proportions of choices following local cues under different global probability. Each black dot corresponds to one participant's average proportion of choices following local cues one ground truth prior global probability condition. The black line connects one participant's proportion of choices following local cues across all ground truth prior global probabilities.">>=
+Boxplot_Local_Cue_VGFL
+@
+
+
+
+\subsubsection{Objective Measure: Proportion of Choices Following the Global Direction}
+<<single factor within-subjects ANOVA _Global_VGFL,echo =FALSE>>=
+
+xlab = "Global: Ground Truth (%) "
+ylab = "Proportion of Choices\nFollowing the Global Direction"
+header = "Average Proportion of Choices Following the Global Direction"
+
+VGFL_Probable_aggregate <- aggregate(cbind(ProbableChose)~ SONAID + Prior_Local+ Prior_Global, dVGFL_pro, base::mean)
+
+VGFL_Probable_aggregate$Prior_Global <- as.factor(VGFL_Probable_aggregate$Prior_Global)
+
+BoxplotProbable_VGFL <- ggplot(VGFL_Probable_aggregate, aes(x = as.factor(Prior_Global), y =ProbableChose, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Global),fill=as.factor(Prior_Global)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Global(%)")
+
+
+# single factor within-subjects ANOVA
+
+VGFL_Probable.aov <- ezANOVA(data=VGFL_Probable_aggregate,dv=.(ProbableChose),wid=.(SONAID),within=.(Prior_Global),type=3)
+#Comment from Sixuan Chen Sphericity assumption not met so we find two corrections to choose.
+# There are two tests in the Sphericity corrections table, the Greenhouse-Geisser (GG) and Huynh-Feldt (HF)
+# The epsilon measures how far the data is from the ideal sphericity and ranges between 0 and 1 where 1 is no departure from sphericity. If the epsilon of Greenhouse-Geisser is greater than 0.75 or there is a small sample size (e.g., 10), the epsilon of Huynh-Feldt should be used.
+@
+
+
+In the Varied Global Fixed Local experiment condition, the exit was either located at the top right or bottom left of the maze. No matter which global probability condition participants experienced, there were always more exits located at the bottom left than exits located at the top right.
+Participants should have considered the bottom left as the global direction for every trial.
+Whether a participant moved left or down indicated if they were moving in a way consistent with the global goal direction.
+
+
+  
+If participants managed to successfully encode the global probability into a mental representation of global probability, they would be expected to rely more on global direction as experience increased.
+
+We performed a single factor within-subjects ANOVA test with Huynh-Feldt correction on the participants' proportions of choices following the global direction, because the Mauchly’s test showed the sphericity assumption was not met (p \Sexpr{formatp(VGFL_Probable.aov$`Mauchly's Test for Sphericity`[3])}).
+As speculated, the results showed that the proportions of choices following the global direction was significantly influenced by the ground truth prior global probability of that trial (F(\Sexpr{(VGFL_Probable.aov$ANOVA['DFn'])}, \Sexpr{(VGFL_Probable.aov$ANOVA['DFd'])}) = \Sexpr{round(VGFL_Probable.aov$`Sphericity Corrections`['HFe'],3)}, p \Sexpr{formatp(VGFL_Probable.aov$`Sphericity Corrections`['p[HF]'])}, $\eta^2$ = $\Sexpr{round(VGFL_Probable.aov$ANOVA['ges'],3)}$).
+
+
+
+<<Post-hoc single factor within-subjects ANOVA _Global_VGFL,echo =FALSE>>=
+
+#post-doc
+VGFL_Probable_aggregate_60 = subset(VGFL_Probable_aggregate, Prior_Global ==60 )
+VGFL_Probable_aggregate_73 = subset(VGFL_Probable_aggregate, Prior_Global ==73 )
+VGFL_Probable_aggregate_80 = subset(VGFL_Probable_aggregate, Prior_Global ==80 )
+
+VGFL_Probable_aggregate_60_73 =t.test(VGFL_Probable_aggregate_60$ProbableChose,VGFL_Probable_aggregate_73$ProbableChose,paired=T)
+VGFL_Probable_aggregate_60_80 =t.test(VGFL_Probable_aggregate_80$ProbableChose,VGFL_Probable_aggregate_60$ProbableChose,paired=T)
+VGFL_Probable_aggregate_73_80 =t.test(VGFL_Probable_aggregate_73$ProbableChose,VGFL_Probable_aggregate_80$ProbableChose,paired=T)
+VGFL_Probable_pvalues<-c(VGFL_Probable_aggregate_60_73$p.value,VGFL_Probable_aggregate_60_80$p.value,VGFL_Probable_aggregate_73_80$p.value)
+
+SEM_min_VGFL_P= min(c(sd(VGFL_Probable_aggregate_60$ProbableChose)/sqrt(lengthSonaid_VGFL),sd(VGFL_Probable_aggregate_73$ProbableChose)/sqrt(lengthSonaid_VGFL),sd(VGFL_Probable_aggregate_80$ProbableChose)/sqrt(lengthSonaid_VGFL)))
+
+SEM_max_VGFL_P= max(c(sd(VGFL_Probable_aggregate_60$ProbableChose)/sqrt(lengthSonaid_VGFL),sd(VGFL_Probable_aggregate_73$ProbableChose)/sqrt(lengthSonaid_VGFL), sd(VGFL_Probable_aggregate_80$ProbableChose)/sqrt(lengthSonaid_VGFL)))
+
+@
+
+Post-hoc paired t-tests revealed that participants' proportions of choices following the global direction increased as the ground truth prior global probability increased from 60\%  (M = \Sexpr{round(mean(VGFL_Probable_aggregate_60$ProbableChose),2)}, SD = \Sexpr{round(sd(VGFL_Probable_aggregate_60$ProbableChose),2)}, SEM= \Sexpr{sd(VGFL_Probable_aggregate_60$ProbableChose)/sqrt(lengthSonaid_VGFL)}) to 73\% (M = \Sexpr{round(mean(VGFL_Probable_aggregate_73$ProbableChose),2)}, SD = \Sexpr{round(sd(VGFL_Probable_aggregate_73$ProbableChose),2)}, SEM= \Sexpr{sd(VGFL_Probable_aggregate_73$ProbableChose)/sqrt(lengthSonaid_VGFL)}, p \Sexpr{formatp(VGFL_Probable_pvalues[1])}).
+The SEM of participants' proportions of choices following the global direction remained similar across different global probability conditions, between \Sexpr{round(SEM_min_VGFL_P,2)} and \Sexpr{round(SEM_max_VGFL_P,2)}. (see Figure \ref{fig:Probable_VGFL})
+
+
+<<Probable_VGFL, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Increasing ground truth prior global probability led to a higher proportion of choices following the global direction in the Varied Global Fixed Local experiment. Different colors represent participants' proportions of choices following the global direction under different global probability conditions. Each black dot is the mean of one participants proportion of choices following the global direction one ground truth prior global probability condition. The black line connects one participant proportion of choices following the global directions across all ground truth prior global probabilities. ">>=
+BoxplotProbable_VGFL
+@
+
+
+<<logistic_regression_probable,echo =FALSE,message = FALSE, warning = FALSE>>=
+
+logistic_Probable_VGFL <- glm(ProbableChose ~ Local_Probability+Global_Probability, data=dVGFL_pro, family="binomial")
+
+logistic_Probable_local_VGFL_95 <-confint(logistic_Probable_VGFL, 'Local_Probability', level=0.95)
+logistic_Probable_global_VGFL_95 <-confint(logistic_Probable_VGFL, 'Global_Probability', level=0.95)
+
+logistic_Probable_VGFL.null <- logistic_Probable_VGFL$null.deviance/-2
+logistic_Probable_VGFL.proposed <- logistic_Probable_VGFL$deviance/-2
+
+## McFadden's Pseudo R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)
+McFadden_Probable_VGFL<- (logistic_Probable_VGFL.null -logistic_Probable_VGFL.proposed) / logistic_Probable_VGFL.null
+
+predicted.data_probable_VGFL <- data.frame(proportion.of.choose_global_direction=logistic_Probable_VGFL$fitted.values,Local_Probability=dVGFL_pro$Local_Probability*0.01, Global_Probability=dVGFL_pro$Global_Probability*0.01, ProbableChose =dVGFL_pro$ProbableChose)
+
+## We can plot the data...
+predicted_Gloabl_Direct_LE_VGFL<-ggscatter(predicted.data_probable_VGFL, x = "Local_Probability" , y = "proportion.of.choose_global_direction",
+          add = "reg.line", conf.int = TRUE,
+          cor.coef = TRUE, cor.method = "kendall",
+          xlab="Local_Probability" ,
+  ylab="Predicted Proportion of Choices")
+
+predicted_Global_Direct_GE_VGFL <-ggscatter(predicted.data_probable_VGFL, x = "Global_Probability" , y = "proportion.of.choose_global_direction",
+          add = "reg.line", conf.int = TRUE,
+          cor.coef = TRUE, cor.method = "kendall",
+          xlab="Global_Probability" ,
+  ylab="Predicted proportion of Choices")
+
+
+res_VGFL_GD_LE<-cor.test(predicted.data_probable_VGFL$Local_Probability,predicted.data_probable_VGFL$proportion.of.choose_global_direction, method="kendall")
+
+ce_VGFL_GD_LE<-round(res_VGFL_GD_LE$estimate,3)
+p_VGFL_GD_LE<-formatp(res_VGFL_GD_LE$p.value)
+
+res_VGFL_GD_GE<-cor.test(predicted.data_probable_VGFL$Global_Probability,predicted.data_probable_VGFL$proportion.of.choose_global_direction, method="kendall")
+
+ce_VGFL_GD_GE<-round(res_VGFL_GD_GE$estimate,3)
+p_VGFL_GD_GE<-formatp(res_VGFL_GD_GE$p.value)
+
+@
+
+
+We were interested in whether participants' objective choices to follow the global direction were influenced by their subjective estimates of local and global probability.
+We included both the participant's subjective local probability and global probability estimates in a logistic regression analysis.
+The odds of following the global direction decreased by \Sexpr{(round((exp(logistic_Probable_VGFL$coefficients[2])-1)*100,3))}\% (95\% CI [\Sexpr{round(logistic_Probable_local_VGFL_95[1]*100,3)}\%, \Sexpr{round(logistic_Probable_local_VGFL_95[2]*100,3)}\%]) for every percentage point increase in the subjective estimates of local probability, and the odds of following the global direction increased by \Sexpr{(round((exp(logistic_Probable_VGFL$coefficients[3])-1)*100,2))}\% (95\% CI [\Sexpr{round(logistic_Probable_global_VGFL_95[1]*100,3)}\%, \Sexpr{round(logistic_Probable_global_VGFL_95[2]*100,3)}\%]) for every percentage increased in the subjective estimate of the subjective estimates of global probability, (McFadden's Pseudo $R^2$ \Sexpr{formatp(McFadden_Probable_VGFL)}). 
+
+This result suggests that participants rely on both local cues and the global direction when making their decisions, and they were more likely to follow the global direction when their estimates of global probability were high and local probability were low.
+
+
+
+\subsubsection{Objective Measure: Proportion of Choices Relied More on Local Cues}
+
+Participants rely on both local cues and the global direction, but which one is more important? One way to compare their influence is to look at choices under conflict. Would participants choose to rely more on the local cues or the global direction when they contradicted each other? 
+<<single factor within-subjects ANOVA _Global_Local_VGFL,echo =FALSE>>=
+xlab = "Global: Ground Truth (%) "
+ylab = "Proportion of Choices\nRelied More on Local Cues"
+header = "Average Proportion of Choices Relied More on Local Cues"
+
+VGFL_Still_Local_Cue_aggregate<- aggregate(cbind(StillChoseBlue)~ SONAID + Prior_Local+ Prior_Global, dVGFL_pro, base::mean)
+
+VGFL_Still_Global_aggregate<- aggregate(cbind(StillChoseProbable)~ SONAID + Prior_Local+ Prior_Global, dVGFL_pro, base::mean)
+
+VGFL_Probable_Local_Cue_aggregate<- aggregate(cbind(BlueProbable)~ SONAID + Prior_Local+ Prior_Global, dVGFL_pro, base::mean)
+
+VGFL_Still_Local_Cue_aggregate$Prior_Global <- as.factor(VGFL_Still_Local_Cue_aggregate$Prior_Global)
+
+VGFL_Probable_Local_Cue_aggregate$Prior_Global <- as.factor(VGFL_Probable_Local_Cue_aggregate$Prior_Global)
+
+VGFL_Probable_Local_Cue_aggregate$NotProbableBlue<-(1- VGFL_Probable_Local_Cue_aggregate$BlueProbable)
+VGFL_Probable_Local_Cue_aggregate$StillProbableBlue<- (VGFL_Still_Local_Cue_aggregate$StillChoseBlue/VGFL_Probable_Local_Cue_aggregate$NotProbableBlue )
+
+VGFL_Probable_Local_Cue_aggregate$StillGlobal<- VGFL_Still_Global_aggregate$StillChoseProbable/VGFL_Probable_Local_Cue_aggregate$NotProbableBlue
+
+BoxplotStillProbableBlue_VGFL <- ggplot(VGFL_Probable_Local_Cue_aggregate, aes(x = as.factor(Prior_Global), y =StillProbableBlue, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Global),fill=as.factor(Prior_Global)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Global(%)")
+
+VGFL_Probable_Local_Cue.aov <- ezANOVA(data=VGFL_Probable_Local_Cue_aggregate,dv=.(StillProbableBlue),wid=.(SONAID),within=.(Prior_Global),type=3)
+
+VGFL_Overall_Still_Local_Cue <- aggregate(cbind(StillProbableBlue)~ SONAID , VGFL_Probable_Local_Cue_aggregate, base::mean)
+
+VGFL_Overall_Still_Global <- aggregate(cbind(StillGlobal)~ SONAID, VGFL_Probable_Local_Cue_aggregate, base::mean)
+
+Global_Local_VGFL<- t.test(VGFL_Overall_Still_Global$StillGlobal, VGFL_Overall_Still_Local_Cue$StillProbableBlue, paired = TRUE)
+
+
+@
+
+We compared the overall average proportion of choices following the global direction as a function of a consistent or inconsistent local cue.
+Paired t-tests showed that when the local cues were not pointing in the global direction, the average proportion of choices still following local cues (M = \Sexpr{round(mean(VGFL_Overall_Still_Local_Cue$StillProbableBlue),2)}, SD = \Sexpr{round(sd(VGFL_Overall_Still_Local_Cue$StillProbableBlue),2)}, SEM = \Sexpr{round(sd(VGFL_Overall_Still_Local_Cue$StillProbableBlue)/sqrt(lengthSonaid_VGFL),2)}) was significantly higher than the average proportion of choices still following the global direction (M = \Sexpr{round(mean(VGFL_Overall_Still_Global$StillGlobal),2)}, SD = \Sexpr{round(sd(VGFL_Overall_Still_Global$StillGlobal),2)}, t(\Sexpr{Global_Local_VGFL$parameter}) = \Sexpr{round(Global_Local_VGFL$statistic,3)}, SEM = \Sexpr{round(sd(VGFL_Overall_Still_Global$StillGlobal)/sqrt(lengthSonaid_VGFL),2)}, p \Sexpr{formatp(Global_Local_VGFL$p.value)}).
+The result showed that people's choice are influenced more by local cues.
+
+
+
+\subsection{Discussion}
+
+Participants had very accurate and precise local probability estimates (SEM around 1.5), and accurate, but less precise, global probability estimates (SEM around 2.0).
+These results demonstrate that participants were able to encoded local and global probability separately.
+
+
+We also addressed the question of whether participants would give more weight to local uncertainty.
+After analyzing participants' objective behavior in the Varied Global Fixed Local task, we found that participants always followed the local colored cue at above chance rates.
+Despite this our logistic regressions showed that objective choices relied on both global and local reliability. 
+The strategy our participants used was beneficial. Performance was above chance in choosing the shortest path across all conditions.
+
+These results are consistent with different mental representations for local probability and global probability.
+People weigh the two sources of information differently when making choices. And those choices reflect their subjective estimates. Subjective reports correlated with the experimental conditions.
+
+However, a reasonable explanation for the emphasis on local probability is the more frequent feedback and the generally easier task of not having to remember events over longer time periods. In order to respond to this explanation we ran a Fixed Global Varied Local experiment.
+
+\section{Fixed Global Varied Local Experiment}
+
+\subsection{Participants}
+
+In the Fixed Global Varied Local experiment, another \Sexpr{length(sonaid_total_FGVL)} participants (Female = \Sexpr{length(Female_total_FGVL)}, Male = \Sexpr{length(Male_total_FGVL)}, Right hand-dominant = \Sexpr{length(RightHandSet_FGVL)}, Left hand-dominant = \Sexpr{length(LeftHandSet_FGVL)}) were analyzed.
+
+\subsection{Procedure}
+Participants were informed that the exits were located 100\% of the time at the bottom right.  Ground truth prior global probability (goal validity) was always 100\%.(see Figure \ref{fig:FGVL}). 
+
+The ground truth prior local probability (cue validity) transitioned between  50\% to 100\%. The transition in ground truth prior local probability was  counterbalanced (low to high and high to low). In the low to high local probability condition, the probability series went from 50\%, 60\%, 70\%, 80\%, 90\%, 100\%, 100\%, 90\%, 80\%, 70\%, 60\%, 50\%. In the high to low local probability condition, the probability series went from 100\%, 90\%, 80\%, 70\%, 60\%, 50\%, 50\%, 60\%, 70\%, 80\%, 90\%, 100\%. \Sexpr{length(LH_total_FGVL)} participants finished the low to high local probability condition, and \Sexpr{length(HL_total_FGVL)} participants finished the high to Low local probability condition. 
+
+\begin{figure}
+\includegraphics[width=0.9\textwidth]{FGVL.png}
+\centering
+\caption{Overview of the Fixed Global Varied Local Experiment Design. A: A typical maze with the start point on top left and exit at bottom right. B: The progression of the local probability across the six conditions. For this experiment, the to-be-attended local cue was the blue circle, so the proportion of each ring being blue corresponds to the ground truth prior local probability for that condition. }
+ \label{fig:FGVL}
+\end{figure}
+
+In addition to making their navigational choices, we had participants provide their best estimate of local probability. 
+They were instructed to leave the global probability slider set at 100\%. 
+After completing each maze, participants received feedback on their local probability estimate. 
+This feedback informed them if the local probability estimate deviated more than ± 5 \% from the ground truth. 
+5\% was far larger than the average variance in estimating local probability 1.5\% from the prior studies.
+Participants knew before the experiment began that if they failed to estimate within this 5\% range then the next maze's local probability would not change, and thus the duration of the experiment would be lengthened. 
+In this way we tried to motivate participants to attend and provide accurate estimates. Only their first round of navigation in each condition was analyzed.
+There was a maximum of 50 mazes that participants could complete. Participants that did not complete all local probability conditions were not included in the data analysis. 
+<<Subjective Estimate,echo =FALSE>>=
+dFGVL<-read.csv("WholeResultsFGVL.csv")
+#d = subset(d, Condition == "LH")
+#d = subset(d, Condition == "LH")
+
+dFGVL =subset(dFGVL, PracticeOrNot == 0)
+dFGVL =subset(dFGVL, Trial <= 15)
+
+sonaid_total_FGVL <- unique(dFGVL$SONAID)
+lengthSonaid_FGVL<- length(sonaid_total_FGVL)
+
+@
+
+
+\subsection{Results}
+Participant performance was measured using methods similar to the Varied Global Fixed Local experiment just reported. 
+
+<<Processed_FGVL_data,echo =FALSE>>=
+addLocalProbabilityColumn <- function (df) {
+
+  df$LocalEstimate<- c(df$Local_Probability[2:length(df$Local_Probability)],NA)
+  return(df)
+}
+prosessFGVLData<- function(d,sonaid_total){
+lengthSonaid<- length(sonaid_total)
+dd2<-c()
+  for (i in 1:lengthSonaid) {
+    curr_id = sonaid_total[i]
+    curr_set = subset(d, SONAID ==curr_id)
+    curr_set =addLocalProbabilityColumn(curr_set)
+    dd2 = rbind(dd2,curr_set)
+  }
+ 
+  return(dd2)
+}
+
+dd_FGVL= prosessFGVLData(dFGVL,sonaid_total_FGVL)
+
+@
+
+\subsubsection{Participants' Subjective Estimate of Local Probability}
+
+<<FGVL Subjective Estimate ,echo =FALSE>>=
+
+xlab = "Local: Ground Truth (%) "
+ylab = "Local: Slider Estimate (%)"
+header = "Average Participant Local Probability Estimate "
+
+pro_data1_FGVL = subset(dd_FGVL, Distance ==0 )
+
+FGVL_Local_Estimate= pro_data1_FGVL[,c("SONAID","Prior_Global","Prior_Local","LocalEstimate","Steps")]
+
+
+FGVL_Local_Estimate <- FGVL_Local_Estimate[complete.cases(FGVL_Local_Estimate),]
+
+FGVL_Local_Estimate$Prior_Local<-strtoi(FGVL_Local_Estimate$Prior_Local)
+FGVL_Local_Estimate_aggregate <- aggregate(cbind(LocalEstimate)~ SONAID + Prior_Local, FGVL_Local_Estimate, base::mean)
+
+
+BoxplotEstimate_FGVL <- ggplot(FGVL_Local_Estimate_aggregate, aes(x = as.factor(Prior_Local), y =LocalEstimate, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Local),fill=as.factor(Prior_Local)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Local(%)")
+
+
+
+
+<<ANOVA FGVL Subjective Estimate ,echo =FALSE>>=
+# For mean and STD
+FGVL_Local_aggregate_50 = subset(FGVL_Local_Estimate_aggregate, Prior_Local ==50 )
+FGVL_Local_aggregate_60 = subset(FGVL_Local_Estimate_aggregate, Prior_Local ==60 )
+FGVL_Local_aggregate_70 = subset(FGVL_Local_Estimate_aggregate, Prior_Local ==70 )
+FGVL_Local_aggregate_80 = subset(FGVL_Local_Estimate_aggregate, Prior_Local ==80 )
+FGVL_Local_aggregate_90 = subset(FGVL_Local_Estimate_aggregate, Prior_Local ==90 )
+FGVL_Local_aggregate_100 = subset(FGVL_Local_Estimate_aggregate, Prior_Local ==100 )
+
+
+# single factor within-subjects ANOVA 
+FGVL_Local_Estimate_aggregate$Prior_Local <- as.factor(FGVL_Local_Estimate_aggregate$Prior_Local)
+FGVL_LE.aov <- ezANOVA(data=FGVL_Local_Estimate_aggregate,dv=.(LocalEstimate),wid=.(SONAID),within=.(Prior_Local),type=3)
+
+@
+
+
+Although participants updated their estimates of local probability throughout the data collection, the timing of these updates were idiosyncratic. Therefore, for our analyses we only used the final probability estimate for each of the six ground-truth probability bins. 
+
+% We checked the sphericity for participants' local estimates, the Mauchly’s test showed there was no departure from sphericity (p \Sexpr{formatp (FGVL_LE.aov$`Mauchly's Test for Sphericity`[3])}). 
+
+We performed a single factor within-subjects ANOVA. Participants' estimates of local probability were significantly influenced by the ground truth prior local probability of that trial (F(\Sexpr{(FGVL_LE.aov$ANOVA['DFn'])}, \Sexpr{(FGVL_LE.aov$ANOVA['DFd'])}) = \Sexpr{round(FGVL_LE.aov$ANOVA['F'],3)}, p \Sexpr{formatp(FGVL_LE.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(FGVL_LE.aov$ANOVA['ges'],3)}$).
+
+<<FGVL post-hoc Subjective Estimate ,echo =FALSE>>=
+
+FGVL_Local_aggregate_50_60 =t.test(FGVL_Local_aggregate_50$LocalEstimate,FGVL_Local_aggregate_60$LocalEstimate,paired=T) 
+FGVL_Local_aggregate_60_70 =t.test(FGVL_Local_aggregate_70$LocalEstimate,FGVL_Local_aggregate_60$LocalEstimate,paired=T) 
+FGVL_Local_aggregate_70_80 =t.test(FGVL_Local_aggregate_70$LocalEstimate,FGVL_Local_aggregate_80$LocalEstimate,paired=T) 
+FGVL_Local_aggregate_80_90 =t.test(FGVL_Local_aggregate_80$LocalEstimate,FGVL_Local_aggregate_90$LocalEstimate,paired=T) 
+FGVL_Local_aggregate_90_100 =t.test(FGVL_Local_aggregate_90$LocalEstimate,FGVL_Local_aggregate_100$LocalEstimate,paired=T) 
+
+FGVL_Local_Estimate_pvalues<-c(FGVL_Local_aggregate_50_60$p.value,FGVL_Local_aggregate_60_70$p.value,FGVL_Local_aggregate_70_80$p.value,FGVL_Local_aggregate_80_90$p.value,FGVL_Local_aggregate_90_100$p.value)
+FGVL_Local_Estimate_pvalues<-p.adjust(FGVL_Local_Estimate_pvalues,'bonferroni',5)
+
+SEM_min_FGVL_LE= min(c(sd(FGVL_Local_aggregate_50$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_60$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_70$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_80$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_90$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_100$LocalEstimate)/sqrt(lengthSonaid_FGVL)))
+
+SEM_max_FGVL_LE= max(c(sd(FGVL_Local_aggregate_50$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_60$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_70$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_80$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_90$LocalEstimate)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_aggregate_100$LocalEstimate)/sqrt(lengthSonaid_FGVL)))
+
+
+@
+
+Furthermore, post-hoc paired t-tests (Bonferroni adjusted) revealed that participants' local probability estimates increased as the ground truth prior local probability increased (50\% (M = \Sexpr{round(mean(FGVL_Local_aggregate_50$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(FGVL_Local_aggregate_50$LocalEstimate),2)}\%, SEM = \Sexpr{round(sd(FGVL_Local_aggregate_50$LocalEstimate)/sqrt(lengthSonaid_FGVL),2)}\%) $<$ 60\% (M = \Sexpr{round(mean(FGVL_Local_aggregate_60$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(FGVL_Local_aggregate_60$LocalEstimate),2)}\% , SEM = \Sexpr{round(sd(FGVL_Local_aggregate_60$LocalEstimate)/sqrt(lengthSonaid_FGVL),2)}\%, p \Sexpr{formatp(FGVL_Local_Estimate_pvalues[1])}) = 70\% (M = \Sexpr{round(mean(FGVL_Local_aggregate_70$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(FGVL_Local_aggregate_70$LocalEstimate),2)}\% , SEM = \Sexpr{round(sd(FGVL_Local_aggregate_70$LocalEstimate)/sqrt(lengthSonaid_FGVL),2)}\%, p \Sexpr{formatp(FGVL_Local_Estimate_pvalues[2])}) $<$ 80\% (M = \Sexpr{round(mean(FGVL_Local_aggregate_80$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(FGVL_Local_aggregate_80$LocalEstimate),2)}\% , SEM = \Sexpr{round(sd(FGVL_Local_aggregate_80$LocalEstimate)/sqrt(lengthSonaid_FGVL),2)}\%, p \Sexpr{formatp(FGVL_Local_Estimate_pvalues[3])}) $<$ 90\% (M = \Sexpr{round(mean(FGVL_Local_aggregate_90$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(FGVL_Local_aggregate_90$LocalEstimate),2)}\% , SEM = \Sexpr{round(sd(FGVL_Local_aggregate_90$LocalEstimate)/sqrt(lengthSonaid_FGVL),2)}\%, p \Sexpr{formatp(FGVL_Local_Estimate_pvalues[4])}) $<$ 100\% (M = \Sexpr{round(mean(FGVL_Local_aggregate_100$LocalEstimate),2)}\%, SD = \Sexpr{round(sd(FGVL_Local_aggregate_100$LocalEstimate),2)}\% , SEM = \Sexpr{round(sd(FGVL_Local_aggregate_100$LocalEstimate)/sqrt(lengthSonaid_FGVL),2)}\%, p \Sexpr{formatp(FGVL_Local_Estimate_pvalues[5])}). The SEM of participants' subjective estimates of local probability remained similar across different ground truth prior local probability conditions, between \Sexpr{round(SEM_min_FGVL_LE,2)}\% and \Sexpr{round(SEM_max_FGVL_LE,2)}\%. The SEM in condition with local probability 100\% was smaller due to a ceiling effect. (see Figure \ref{fig:FGVL_LE})
+
+
+<<FGVL_LE, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = paste( "Increasing ground truth prior local probability led to higher estimates of local probability in the Fixed Global Varied Local Experiment.  Different colors represent participants' estimates of local probability under different ground truth prior local probability conditions. Each black dot corresponds to one participant's average estimates of local probability one ground truth prior local probability condition. The black line connects one participant's estimates of local probability across all ground truth prior local probability." )>>=
+BoxplotEstimate_FGVL
+@
+
+
+\subsubsection{Objective Measures: Proportion of Choices Following of the Shortest Path Direction}
+
+
+<<Objective_Behavior_FGVL,echo =FALSE>>=
+
+dFGVL_pro<-read.csv("WholeTurnbackResults_FGVL.csv")
+
+
+sonaid_total_FGVL <- unique(dFGVL_pro$SONAID)
+lengthSonaid_FGVL<- length(sonaid_total_FGVL)
+dFGVL_pro =subset(dFGVL_pro, PracticeOrNot == 0)
+
+dFGVL_pro$Prior_Local <- as.factor(dFGVL_pro$Prior_Local)
+@
+
+
+The overall performance of participants’ maze navigation was measured by the proportion of a participant's choices that followed the shortest path direction.
+<<graph single factor within-subjects ANOVA _correct_VGFL,echo =FALSE>>=
+xlab = "Local: Ground Truth (%) "
+ylab = "Proportion of Choices\nFollowing the Shortest Path Direction"
+header = "Average Proportion of Choices Following the Shortest Path Direction"
+
+FGVL_Correct_aggregate <- aggregate(cbind(Player_Correct)~ SONAID + Prior_Local+ Prior_Global, dFGVL_pro, base::mean)
+
+FGVL_Correct_aggregate$Prior_Local <- as.factor(FGVL_Correct_aggregate$Prior_Local)
+BoxplotCorrect_FGVL <- ggplot(FGVL_Correct_aggregate, aes(x = as.factor(Prior_Local), y =Player_Correct, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Local),fill=as.factor(Prior_Local)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header,, fill = "Prior Local(%)")
+FGVL_Correct_aggregate$Prior_Local <- as.factor(FGVL_Correct_aggregate$Prior_Local)
+
+FGVL_Correct.aov <- ezANOVA(data=FGVL_Correct_aggregate,dv=.(Player_Correct),wid=.(SONAID),within=.(Prior_Local),type=3)
+@
+
+
+A single factor within-subjects ANOVA revealed that there was a main effect of the ground truth prior local probability on the participants' likelihood of choosing the route option that followed the shortest path (F(\Sexpr{(FGVL_Correct.aov$ANOVA['DFn'])}, \Sexpr{(FGVL_Correct.aov$ANOVA['DFd'])}) = \Sexpr{round(FGVL_Correct.aov$ANOVA['F'],3)}, p \Sexpr{formatp(FGVL_Correct.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(FGVL_Correct.aov$ANOVA['ges'],3)}$).
+
+<< Post-hoc single factor within-subjects ANOVA _correct_FGVL,echo =FALSE>>=
+#post-hoc
+# 
+FGVL_Correct_aggregate_50 = subset( FGVL_Correct_aggregate, Prior_Local ==50 )
+FGVL_Correct_aggregate_60 = subset( FGVL_Correct_aggregate, Prior_Local ==60 )
+FGVL_Correct_aggregate_70 = subset( FGVL_Correct_aggregate, Prior_Local ==70 )
+FGVL_Correct_aggregate_80 = subset( FGVL_Correct_aggregate, Prior_Local ==80 )
+FGVL_Correct_aggregate_90 = subset( FGVL_Correct_aggregate, Prior_Local ==90 )
+FGVL_Correct_aggregate_100 = subset( FGVL_Correct_aggregate, Prior_Local ==100 )
+
+
+FGVL_Correct_aggregate_50_60 =t.test(FGVL_Correct_aggregate_50$Player_Correct,FGVL_Correct_aggregate_60$Player_Correct,paired=T) 
+FGVL_Correct_aggregate_60_70 =t.test(FGVL_Correct_aggregate_70$Player_Correct,FGVL_Correct_aggregate_60$Player_Correct,paired=T) 
+FGVL_Correct_aggregate_70_80 =t.test(FGVL_Correct_aggregate_70$Player_Correct,FGVL_Correct_aggregate_80$Player_Correct,paired=T) 
+FGVL_Correct_aggregate_80_90 =t.test(FGVL_Correct_aggregate_80$Player_Correct,FGVL_Correct_aggregate_90$Player_Correct,paired=T) 
+FGVL_Correct_aggregate_90_100 =t.test(FGVL_Correct_aggregate_90$Player_Correct,FGVL_Correct_aggregate_100$Player_Correct,paired=T) 
+
+FGVL_Correct_pvalues<-c(FGVL_Correct_aggregate_50_60$p.value,FGVL_Correct_aggregate_60_70$p.value,FGVL_Correct_aggregate_70_80$p.value,FGVL_Correct_aggregate_80_90$p.value,FGVL_Correct_aggregate_90_100$p.value)
+FGVL_Correct_pvalues<-p.adjust(FGVL_Correct_pvalues,'bonferroni',5)
+
+SEM_min_FGVL_C= min(c(sd(FGVL_Correct_aggregate_50 $Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_60$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_70$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_80$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_90$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_100$Player_Correct)/sqrt(lengthSonaid_FGVL)))
+
+SEM_max_FGVL_C= max(c(sd(FGVL_Correct_aggregate_50$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_60$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_70$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_80$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_90$Player_Correct)/sqrt(lengthSonaid_FGVL),sd(FGVL_Correct_aggregate_100$Player_Correct)/sqrt(lengthSonaid_FGVL)))
+
+
+@
+Post-hoc paired t-tests (Bonferroni adjusted) further indicted that participants' following the shortest path direction proportion increased as the ground truth prior local probability increased (50\% (M = \Sexpr{round(mean(FGVL_Correct_aggregate_50$Player_Correct),2)}, SD = \Sexpr{round(sd(FGVL_Correct_aggregate_50$Player_Correct),2)}, SEM = \Sexpr{round(sd(FGVL_Correct_aggregate_50$Player_Correct)/sqrt(lengthSonaid_FGVL),2)}) $<$ 60\% (M = \Sexpr{round(mean(FGVL_Correct_aggregate_60$Player_Correct),2)}, SD = \Sexpr{round(sd(FGVL_Correct_aggregate_60$Player_Correct),2)}, SEM = \Sexpr{round(sd(FGVL_Correct_aggregate_60$Player_Correct)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Correct_pvalues[1])}) $<$ 70\% (M = \Sexpr{round(mean(FGVL_Correct_aggregate_70$Player_Correct),2)}, SD = \Sexpr{round(sd(FGVL_Correct_aggregate_70$Player_Correct),2)}, SEM = \Sexpr{round(sd(FGVL_Correct_aggregate_70$Player_Correct)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Correct_pvalues[2])}) $<$ 80\% (M = \Sexpr{round(mean(FGVL_Correct_aggregate_80$Player_Correct),2)}, SD = \Sexpr{round(sd(FGVL_Correct_aggregate_80$Player_Correct),2)}, SEM = \Sexpr{round(sd(FGVL_Correct_aggregate_80$Player_Correct)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Correct_pvalues[3])}) $<$ 90\% (M = \Sexpr{round(mean(FGVL_Correct_aggregate_90$Player_Correct),2)}, SD = \Sexpr{round(sd(FGVL_Correct_aggregate_90$Player_Correct),2)}, SEM = \Sexpr{round(sd(FGVL_Correct_aggregate_90$Player_Correct)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Correct_pvalues[4])}) $<$ 100\% (M = \Sexpr{round(mean(FGVL_Correct_aggregate_100$Player_Correct),2)}, SD = \Sexpr{round(sd(FGVL_Correct_aggregate_100$Player_Correct),2)}, SEM = \Sexpr{round(sd(FGVL_Correct_aggregate_100$Player_Correct)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Correct_pvalues[5])}). The SEM of participants' following the shortest path direction proportion remained similar across different ground truth prior local probability conditions (between \Sexpr{round(SEM_min_FGVL_C,2)} and \Sexpr{round(SEM_max_FGVL_C,2)}).
+
+At each decision-making point there were either two or three choice options. Therefore, the lower bound for participants to randomly choose the shortest path direction was 33.33\%, and the higher bound was 50\%. 
+Comparing participants to these bounds shows that participants' performances exceeded what would have been found with purely random choices (see Figure \ref{fig:Correct_FGVL}).
+
+
+<<Correct_FGVL, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Increasing ground truth prior local probability led to a higher proportion of choices following the shortest path direction in the Fixed Global Varied Local Experiment. Average participants’ proportions of choices following the shortest path direction proportions were higher than chance in all prior local probabilities. Different colors represent participants’ proportions of choices following the shortest path direction under different ground truth prior local probabilities. Each black dot corresponds to one participant’s average proportion of choices following the shortest path direction one ground truth prior local probability condition. The black line connects one participant’s proportion of choices following the shortest path direction across all ground truth prior local probabilities.">>=
+BoxplotCorrect_FGVL
+@
+
+
+\subsubsection{Objective Measure: Proportion of Choices Following Local Cues}
+<<single factor within-subjects ANOVA _blue_FGVL,echo =FALSE>>=
+
+xlab = "Local: Ground Truth (%)"
+ylab = "Proportion of Choices\nFollowing Local Cues"
+header = "Average Proportion of Choices Following Local Cues"
+
+FGVL_Local_Cue_aggregate <- aggregate(cbind(Player_Blue)~ SONAID + Prior_Local+ Prior_Global, dFGVL_pro, base::mean)
+
+FGVL_Local_Cue_aggregate $Prior_Local <- as.factor(FGVL_Local_Cue_aggregate $Prior_Local)
+
+Boxplot_Local_Cue_FGVL <- ggplot(FGVL_Local_Cue_aggregate , aes(x = as.factor(Prior_Local), y =Player_Blue, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Local),fill=as.factor(Prior_Local)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Local(%)")  
+
+
+# single factor within-subjects ANOVA 
+FGVL_Local_Cue_aggregate$Prior_Local <- as.factor(FGVL_Local_Cue_aggregate$Prior_Local)
+FGVL_Local_Cue.aov <- ezANOVA(data=FGVL_Local_Cue_aggregate,dv=.(Player_Blue),wid=.(SONAID),within=.(Prior_Local),type=3)
+
+FGVL_Local_Cue_aggregate_50 = subset( FGVL_Local_Cue_aggregate , Prior_Local ==50 )
+FGVL_Local_Cue_aggregate_60 = subset( FGVL_Local_Cue_aggregate , Prior_Local ==60 )
+FGVL_Local_Cue_aggregate_70 = subset( FGVL_Local_Cue_aggregate , Prior_Local ==70 )
+FGVL_Local_Cue_aggregate_80 = subset( FGVL_Local_Cue_aggregate , Prior_Local ==80 )
+FGVL_Local_Cue_aggregate_90 = subset( FGVL_Local_Cue_aggregate , Prior_Local ==90 )
+FGVL_Local_Cue_aggregate_100 = subset( FGVL_Local_Cue_aggregate , Prior_Local ==100 )
+
+FGVL_Local_Cue_aggregate_50_70 =t.test(FGVL_Local_Cue_aggregate_50$Player_Blue,FGVL_Local_Cue_aggregate_70$Player_Blue,paired=T) 
+FGVL_Local_Cue_aggregate_60_80 =t.test(FGVL_Local_Cue_aggregate_80$Player_Blue,FGVL_Local_Cue_aggregate_60$Player_Blue,paired=T) 
+FGVL_Local_Cue_aggregate_70_90 =t.test(FGVL_Local_Cue_aggregate_70$Player_Blue,FGVL_Local_Cue_aggregate_90$Player_Blue,paired=T) 
+FGVL_Local_Cue_aggregate_80_100 =t.test(FGVL_Local_Cue_aggregate_80$Player_Blue,FGVL_Local_Cue_aggregate_100$Player_Blue,paired=T)
+
+FGVL_Local_Cue_pvalues<-c(FGVL_Local_Cue_aggregate_50_70$p.value,FGVL_Local_Cue_aggregate_60_80$p.value,FGVL_Local_Cue_aggregate_70_90$p.value,FGVL_Local_Cue_aggregate_80_100$p.value)
+FGVL_Local_Cue_pvalues<-p.adjust(FGVL_Local_Cue_pvalues,'bonferroni',4)
+
+SEM_min_FGVL_LC= min(c(sd(FGVL_Local_Cue_aggregate_50$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_60$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_70$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_80$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_90$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_100$Player_Blue)/sqrt(lengthSonaid_FGVL)))
+
+SEM_max_FGVL_LC= max(c(sd(FGVL_Local_Cue_aggregate_50$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_60$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_70$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_80$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_90$Player_Blue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Local_Cue_aggregate_100$Player_Blue)/sqrt(lengthSonaid_FGVL)))
+
+@
+
+If participants managed to encode local probability they should rely more on the local cue as their estimate of its reliability increased. 
+A single factor within-subjects ANOVA analyzed the proportion of choices of following the local cue. 
+% We checked the sphericity for the proportion of choices following local cues in different local probability condition, the assumption of sphericity for single factor within-subjects ANOVA  was met (p \Sexpr{formatp (FGVL_Local_Cue.aov$`Mauchly's Test for Sphericity`[3])}). 
+It was significantly influenced by ground truth prior local probability (F(\Sexpr{(FGVL_Local_Cue.aov$ANOVA['DFn'])}, \Sexpr{(FGVL_Local_Cue.aov$ANOVA['DFd'])}) = \Sexpr{round(FGVL_Local_Cue.aov$ANOVA['F'],3)}, p \Sexpr{formatp(FGVL_Local_Cue.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(FGVL_Local_Cue.aov$ANOVA['ges'],3)}$).
+
+Post-hoc paired t-tests (Bonferroni adjusted) revealed that the effect of ground truth prior local probability were typically significant when the differences between ground truth prior global and local probability exceeded 20\% (50\% (M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_50$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_50$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_50$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}) = 70\% (M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_70$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_70$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_70$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Local_Cue_pvalues[1])}), 60\%(M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_60$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_60$Player_Blue),2)}) $<$ 80\% (M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_80$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_80$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_80$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Local_Cue_pvalues[2])}), 70\%(M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_70$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_70$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_70$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}) $<$ 90\% (M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_90$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_90$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_90$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Local_Cue_pvalues[3])}) , 80\% (M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_80$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_80$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_80$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}) $<$100\% (M = \Sexpr{round(mean(FGVL_Local_Cue_aggregate_100$Player_Blue),2)}, SD = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_100$Player_Blue),2)}, SEM = \Sexpr{round(sd(FGVL_Local_Cue_aggregate_100$Player_Blue)/sqrt(lengthSonaid_FGVL),2)}, p \Sexpr{formatp(FGVL_Local_Cue_pvalues[4])}). SEMs of participants' choices proportions was similar across different ground truth prior local probability conditions  (between \Sexpr{round(SEM_min_FGVL_LC,2)} and \Sexpr{round(SEM_max_FGVL_LC,2)}; see Figure \ref{fig:Blue_FGVL}). 
+
+
+<<Blue_FGVL, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Increasing ground truth prior local probability led to a higher proportion following local cues at the decision-making point in the Fixed Global Varied Local Experiment. The average proportion of choices following local cues were higher than the what they would do by chance in all ground truth prior local probabilities. Different colors represent participants' proportions of choices following local cues under different ground truth prior local probabilities. Each black dot corresponds to one participant's average proportion of choices following local cues given one ground truth prior local probability. The black line connects one participant's proportion of choices following local cues across all local probability.">>=
+Boxplot_Local_Cue_FGVL
+@
+
+
+<<logistic_regression_blue,echo =FALSE,message = FALSE, warning = FALSE>>=
+
+logistic_Local_Cue_FGVL <- glm(Player_Blue ~ Local_Probability, data=dFGVL_pro, family="binomial")
+
+
+logistic_Local_Cue_FGVL_95 <-confint(logistic_Local_Cue_FGVL, 'Local_Probability', level=0.95)
+
+ll_Local_Cue_FGVL.null <- logistic_Local_Cue_FGVL$null.deviance/-2
+ll_Local_Cue_FGVL.proposed<- logistic_Local_Cue_FGVL$deviance/-2
+
+
+## McFadden's Pseudo R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)
+McFadden_blue_FGVL<- (ll_Local_Cue_FGVL.null - ll_Local_Cue_FGVL.proposed) / ll_Local_Cue_FGVL.null
+
+predicted.data_Local_Cue_FGVL <- data.frame(proportion.of.choose_Local_Cue=logistic_Local_Cue_FGVL$fitted.values,Local_Probability=dFGVL_pro$Local_Probability*0.01, Player_Blue =dFGVL_pro$Player_Blue)
+
+
+## We can plot the data...
+predicted_Local_Cue_FGVL<-ggscatter(predicted.data_Local_Cue_FGVL, x = "Local_Probability" , y = "proportion.of.choose_Local_Cue", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "kendall",
+          xlab="Local_Probability" ,
+  ylab="Predicted Proportion of Choices")  
+
+res_FGVL_LE<-cor.test(predicted.data_Local_Cue_FGVL$Local_Probability,predicted.data_Local_Cue_FGVL$proportion.of.choose_Local_Cue, method="kendall")
+
+
+ce_FGVL_LE<-round(res_FGVL_LE$estimate,3)
+
+p_FGVL_LE<-formatp(res_FGVL_LE$p.value)
+
+@
+The impact of ground truth prior local probability on participants’ decisions was large. A logistic regression analysis tested if subjective estimates also predicted objective local cue choices.
+It was found that the odds of choosing the movement direction indicated by the local cues increased by \Sexpr{(round((exp(logistic_Local_Cue_FGVL$coefficients[2])-1)*100,2))}\% (95\% CI [\Sexpr{round(logistic_Local_Cue_FGVL_95[1]*100,2)}\%, \Sexpr{round(logistic_Local_Cue_FGVL_95[2]*100,2)}\%]) for every percentage increase in the subjective estimates of local probability (McFadden's Pseudo $R^2$ = \Sexpr{round(McFadden_blue_FGVL,2)}). 
+
+ 
+<<Repeated Measures ANOVA_Global_FGVL,echo =FALSE>>=
+
+xlab = "Local: Ground Truth (%)"
+ylab = "Proportion of Choices\n Following the Global Direction"
+header = "Average Proportion of Choices Following the Global Direction"
+
+FGVL_Probable_aggregate <- aggregate(cbind(ProbableChose)~ SONAID + Prior_Local+ Prior_Global, dFGVL_pro, base::mean)
+FGVL_Probable_aggregate$Prior_Local <- as.factor(FGVL_Probable_aggregate$Prior_Local)
+
+BoxplotProbable_FGVL<- ggplot(FGVL_Probable_aggregate, aes(x = as.factor(Prior_Local), y =ProbableChose, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Local),fill=as.factor(Prior_Local)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Local(%)")  
+
+FGVL_Probable_aggregate$Prior_Local <- as.factor(FGVL_Probable_aggregate$Prior_Local)
+FGVL_Probable.aov <- ezANOVA(data=FGVL_Probable_aggregate,dv=.(ProbableChose),wid=.(SONAID),within=.(Prior_Local),type=3)
+
+FGVL_Probable_aggregate_50 = subset( FGVL_Probable_aggregate , Prior_Local ==50 )
+FGVL_Probable_aggregate_60 = subset( FGVL_Probable_aggregate , Prior_Local ==60 )
+FGVL_Probable_aggregate_70 = subset( FGVL_Probable_aggregate , Prior_Local ==70 )
+FGVL_Probable_aggregate_80 = subset( FGVL_Probable_aggregate , Prior_Local ==80 )
+FGVL_Probable_aggregate_90 = subset( FGVL_Probable_aggregate , Prior_Local ==90 )
+FGVL_Probable_aggregate_100 = subset( FGVL_Probable_aggregate , Prior_Local ==100 )
+
+
+SEM_min_FGVL_P= min(c(sd(FGVL_Probable_aggregate_50$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_60$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_70$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_80$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_90$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_100$ProbableChose)/sqrt(lengthSonaid_FGVL)))
+
+SEM_max_FGVL_P= max(c(sd(FGVL_Probable_aggregate_50$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_60$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_70$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_80$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_90$ProbableChose)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_aggregate_100$ProbableChose)/sqrt(lengthSonaid_FGVL)))
+
+
+@
+
+\subsubsection{Objective Measure: Proportion of Choices Following the Global Direction}
+
+We computed whether participants' choices were globally optimal using a simple algorithm based on their current position in the maze.  We started the x at the left at zero, and started the y at the top at zero.
+If a participant's current x coordinate was greater than their current y coordinate then they were in the right part of the maze, thus the decision of moving down meant they followed the global direction. 
+
+  
+If the participant's current y coordinate was greater than their current x coordinate then they were in the bottom part of the maze, thus the decision of moving right meant they followed the global direction. 
+If participants current x and y coordinates were equal, then the decision of moving either right or down meant they followed the global direction. 
+
+
+%The Mauchly’s test showed there was no departure from sphericity (p \Sexpr{formatp (FGVL_Probable.aov$`Mauchly's Test for Sphericity`[3])}).  
+As expected, the ANOVA analysis showed that the proportion of choices following the global direction was not significantly influenced by the ground truth prior \emph{local} probability of that trial (F(\Sexpr{(FGVL_Probable.aov$ANOVA['DFn'])}, \Sexpr{(FGVL_Probable.aov$ANOVA['DFd'])}) = \Sexpr{round(FGVL_Probable.aov$ANOVA['F'],3)}, p \Sexpr{formatp(FGVL_Probable.aov$ANOVA['p'])}, $\eta^2$ = $\Sexpr{round(FGVL_Probable.aov$ANOVA['ges'],3)}$). 
+
+<<Probable_FGVL, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "The change in ground truth prior local probability did not lead to significant differences in participants' proportions of choices following the global direction in the Fixed Global Varied Local Experiment. Different colors represent participants' proportions of choices following the global direction under different local probability. Each black dot is the mean of one participant's proportions of choices following the global direction one ground truth prior local probability condition. The black line connects one participant proportion of choices following the global directions across all local probability. ">>=
+BoxplotProbable_FGVL
+@
+
+\subsubsection{Objective Measure: Proportion of Choices Relied More on Local Cues}
+At some decision points participants had conflicting information, they could choose either to follow the global direction or not follow it if the local cues pointed in a different direction. Now the global direction was fixed and 100\% reliable, how would participants make their choices when the two indicators, local and global, were in conflict?
+<<single factor within-subjects ANOVA _Global_Local_FGVL,echo =FALSE>>=
+
+xlab = "Local: Ground Truth (%) "
+ylab = "Proportion of Choices\nRelied More on Local Cues"
+header = "Average Proportion of Choices Relied More on Local Cues"
+
+FGVL_Still_Local_Cue_aggregate <- aggregate(cbind(StillChoseBlue)~ SONAID + Prior_Local+ Prior_Global, dFGVL_pro, base::mean)
+
+FGVL_Still_Global_aggregate <- aggregate(cbind(StillChoseProbable)~ SONAID + Prior_Local+ Prior_Global, dFGVL_pro, base::mean)
+
+FGVL_Probable_Local_Cue_aggregate <- aggregate(cbind(BlueProbable)~ SONAID + Prior_Local+ Prior_Global, dFGVL_pro, base::mean)
+
+FGVL_Still_Local_Cue_aggregate$Prior_Local <- as.factor(FGVL_Still_Local_Cue_aggregate$Prior_Local)
+
+FGVL_Probable_Local_Cue_aggregate$Prior_Local <- as.factor(FGVL_Probable_Local_Cue_aggregate$Prior_Local)
+
+FGVL_Probable_Local_Cue_aggregate$NotProbableBlue<-(1- FGVL_Probable_Local_Cue_aggregate$BlueProbable)
+FGVL_Probable_Local_Cue_aggregate$StillProbableBlue<- (FGVL_Still_Local_Cue_aggregate$StillChoseBlue/FGVL_Probable_Local_Cue_aggregate$NotProbableBlue )
+
+FGVL_Probable_Local_Cue_aggregate$StillGlobal<- FGVL_Still_Global_aggregate$StillChoseProbable/FGVL_Probable_Local_Cue_aggregate$NotProbableBlue
+
+BoxplotStillProbableBlue_FGVL <- ggplot(FGVL_Probable_Local_Cue_aggregate, aes(x = as.factor(Prior_Local), y =StillProbableBlue, group = SONAID)) + geom_boxplot(aes(group=as.factor(Prior_Local),fill=as.factor(Prior_Local)),lwd=1) + geom_point(alpha=(0.8)) + geom_line(alpha=(0.5), color = "black") + labs(x=xlab,y=ylab,title=header, fill = "Prior Local(%)")  
+
+FGVL_Probable_Local_Cue.aov <- ezANOVA(data=FGVL_Probable_Local_Cue_aggregate,dv=.(StillProbableBlue),wid=.(SONAID),within=.(Prior_Local),type=3)
+@
+
+
+
+
+<<Post-hoc single factor within-subjects ANOVA _Global_Local_FGVL,echo =FALSE>>=
+
+#post-doc
+FGVL_Probable_Local_Cue_50 = subset(FGVL_Probable_Local_Cue_aggregate, Prior_Local==50 )
+FGVL_Probable_Local_Cue_60 = subset(FGVL_Probable_Local_Cue_aggregate, Prior_Local==60 )
+FGVL_Probable_Local_Cue_70 = subset(FGVL_Probable_Local_Cue_aggregate, Prior_Local==70 )
+FGVL_Probable_Local_Cue_80 = subset(FGVL_Probable_Local_Cue_aggregate, Prior_Local==80 )
+FGVL_Probable_Local_Cue_90 = subset(FGVL_Probable_Local_Cue_aggregate, Prior_Local==90 )
+FGVL_Probable_Local_Cue_100 = subset(FGVL_Probable_Local_Cue_aggregate, Prior_Local==100 )
+
+SEM_min_FGVL_SL= min(c(sd(FGVL_Probable_Local_Cue_50$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_60$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_70$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_80$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_90$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_100$StillProbableBlue)/sqrt(lengthSonaid_FGVL)))
+
+
+SEM_max_FGVL_SL= max(c(sd(FGVL_Probable_Local_Cue_50$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_60$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_70$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_80$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_90$StillProbableBlue)/sqrt(lengthSonaid_FGVL),sd(FGVL_Probable_Local_Cue_100$StillProbableBlue)/sqrt(lengthSonaid_FGVL)))
+
+
+
+FGVL_Probable_Local_Cue_50_80 =t.test(FGVL_Probable_Local_Cue_50$StillProbableBlue,FGVL_Probable_Local_Cue_80$StillProbableBlue,paired=T) 
+FGVL_Probable_Local_Cue_60_90 =t.test(FGVL_Probable_Local_Cue_60$StillProbableBlue,FGVL_Probable_Local_Cue_90$StillProbableBlue,paired=T) 
+FGVL_Probable_Local_Cue_70_100 =t.test(FGVL_Probable_Local_Cue_70$StillProbableBlue,FGVL_Probable_Local_Cue_100$StillProbableBlue,paired=T) 
+
+FGVL_Probable_Local_Cue_pvalues<-c(FGVL_Probable_Local_Cue_50_80$p.value,FGVL_Probable_Local_Cue_60_90$p.value,FGVL_Probable_Local_Cue_70_100$p.value)
+FGVL_Probable_Local_Cue_pvalues<-p.adjust(FGVL_Probable_Local_Cue_pvalues,'bonferroni',3)
+FGVL_Overall_Still_Local_Cue <- aggregate(cbind(StillProbableBlue)~ SONAID , FGVL_Probable_Local_Cue_aggregate, base::mean)
+FGVL_Overall_Still_Global <- aggregate(cbind(StillGlobal)~ SONAID , FGVL_Probable_Local_Cue_aggregate, base::mean)
+
+Global_Local_FGVL<- t.test(FGVL_Overall_Still_Global$StillGlobal, FGVL_Overall_Still_Local_Cue$StillProbableBlue, paired = TRUE)
+
+
+@
+
+
+To compare the influence of local and global cues we focused on trials where the cues were inconsistent. 
+Paired t-tests (Bonferroni corrected) showed that when the local cues were \emph{not} pointing toward the global exit direction, the average proportion of choices following local cues did not vary  t(\Sexpr{Global_Local_FGVL$parameter}) = \Sexpr{round(Global_Local_FGVL$statistic,3)}, p \Sexpr{formatp(Global_Local_FGVL$p.value)} (M = \Sexpr{round(mean(FGVL_Overall_Still_Local_Cue$StillProbableBlue),2)}, SD = \Sexpr{round(sd(FGVL_Overall_Still_Local_Cue$StillProbableBlue),2)}, SEM = \Sexpr{round(sd(FGVL_Overall_Still_Local_Cue$StillProbableBlue)/sqrt(lengthSonaid_FGVL),2)}) and was similar with the average proportion of choices following the global direction (M = \Sexpr{round(mean(FGVL_Overall_Still_Global$StillGlobal),2)}, SD = \Sexpr{round(sd(FGVL_Overall_Still_Global$StillGlobal),2)}, SEM = \Sexpr{round(sd(FGVL_Overall_Still_Global$StillGlobal)/sqrt(lengthSonaid_FGVL),2)}) although every participant knew the global direction was located at the bottom right 100\% of the time. 
+Thus, even when informed of the exit location, participants sometimes made a choice that followed the local cue even if that took them away from the known exit location.  
+
+
+
+
+<<FGVL Bar,echo =FALSE, message = FALSE, warning = FALSE>>=
+FGVL_DV_aggregate<- data.frame (Prior_Local = FGVL_Correct_aggregate$Prior_Local,
+
+                 Local_Cue = FGVL_Local_Cue_aggregate$Player_Blue,
+                 Global_Direction =FGVL_Probable_aggregate$ProbableChose )
+
+FGVL_DV_aggregate_mean <- aggregate(cbind(Global_Direction,Local_Cue)~ Prior_Local, FGVL_DV_aggregate, base::mean)
+FGVL_DV_aggregate_mean_sd <- aggregate(cbind(Global_Direction,Local_Cue)~ Prior_Local, FGVL_DV_aggregate, sd)
+FGVL_DV_aggregate_mean_sd$Global_Direction<- FGVL_DV_aggregate_mean_sd$Global_Direction/sqrt(lengthSonaid_FGVL)
+
+FGVL_DV_aggregate_mean_sd$Local_Cue <- FGVL_DV_aggregate_mean_sd$Local_Cue/sqrt(lengthSonaid_FGVL)
+
+FGVL_DV_aggregate_mean_melt  <- melt(FGVL_DV_aggregate_mean  )
+names(FGVL_DV_aggregate_mean_melt )[3] <- "DV"
+
+FGVL_DV_aggregate_mean_melt_SEM  <- melt(FGVL_DV_aggregate_mean_sd  )
+names(FGVL_DV_aggregate_mean_melt_SEM )[3] <- "SEM"
+FGVL_DV_aggregate_mean_melt$SEM<-FGVL_DV_aggregate_mean_melt_SEM$SEM
+
+xlab = "Local: Ground Truth (%) "
+ylab = "Proportion of Choices\nFollowing Local Cues or the Global Direction"
+header = "Average Proportion of Choices Following Local Cues or the Global Direction"
+
+FGVL_Bar_plot <- ggplot(FGVL_DV_aggregate_mean_melt , aes(x = Prior_Local, y= DV, fill = variable)) +
+   geom_bar(stat="identity", width=.5, position = "dodge") + scale_y_continuous(breaks = seq(0, 1, by = 0.1))+ labs(x=xlab,y=ylab,title=header, fill = "Prior Local(%)")+
+  geom_errorbar( aes(x= Prior_Local, ymin= DV-SEM, ymax= DV+SEM), , width=.2,position=position_dodge(.5), colour="black", alpha=0.9, size=0.8)  
+
+
+
+@
+To test if this varied with ground truth prior local probability we performed paired t-tests. The paired t-tests (Bonferroni corrected) showed that participants showed no preference for following local cues when it provided no information (50\% condition; p \Sexpr{formatp(test_DV(FGVL_Local_Cue_aggregate_50$Player_Blue,FGVL_Probable_aggregate_50$ProbableChose,TRUE))}), or little information (60\% (p \Sexpr{formatp(test_DV(FGVL_Local_Cue_aggregate_60$Player_Blue,FGVL_Probable_aggregate_60$ProbableChose,TRUE))}); 70\% (p \Sexpr{formatp(test_DV(FGVL_Local_Cue_aggregate_70$Player_Blue,FGVL_Probable_aggregate_70$ProbableChose,TRUE))})), but showed a strong preference to local cues after ground truth prior local probability reached 80\% (p \Sexpr{formatp(test_DV(FGVL_Local_Cue_aggregate_80$Player_Blue,FGVL_Probable_aggregate_80$ProbableChose,TRUE))}), 90\% (p \Sexpr{formatp(test_DV(FGVL_Local_Cue_aggregate_90$Player_Blue,FGVL_Probable_aggregate_90$ProbableChose,TRUE))}), and 100\% (p \Sexpr{formatp(test_DV(FGVL_Local_Cue_aggregate_100$Player_Blue,FGVL_Probable_aggregate_100$ProbableChose,TRUE))}). Participants only relied on the local cues more when their ground truth prior probability exceeded 80\%. (see Figure \ref{fig:FGVL_Bar})
+
+
+<<FGVL_Bar, fig.width=7,fig.height=4,fig.dpi=600, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "In the Fixed Gloabl Varied Local experiment, participants only relied more on the local cues in choosing their navigational choices when ground truth prior local probability was higher than 80\\%. Error bars represent one SEM." >>=
+FGVL_Bar_plot
+@
+
+\subsection{Discussion}
+The goal of this Fixed Global Varied Local experiment was to explore how participants would make decisions when the exit location was fixed and they only needed to consider the changing of the local cues' validity. 
+We found that participants' subjective and objective probability estimates tracked the experimentally programmed cue validity in the face of the unchanging global probability.
+Participants had higher average estimates than ground truth when they were at low local probability levels (the 50\% and 60\% conditions), but lower average estimates than ground truth when local probability was high (the 70\%, 80\%, 90\%, and 100\% conditions). 
+This was consistent with previous uncertainty estimation experiments: people overestimate the low probability events and underestimate the high probability event \citep{khaw2021individual,attneave1953psychological}. 
+
+
+Across all conditions participants' always chose the maze direction indicated by the local cue more often (50\%).
+They relied more on the local cues than they relied on the global direction.
+Despite the global direction being 100\% reliable, participants' choice proportions for following local cues was higher than that in the Varied Global Fixed Local study reported above.
+
+One reason for this pattern might be that animals, including humans, are intrinsically motivated to gain information \citep{gottlieb2013information}.
+We have a preference for information. Selecting a stochastic option over the ``sure-thing'' might be seen as exploration to learn more about the stochastic cue.
+
+
+\section{General Discussion}
+
+The goal of this research was to explore whether people could combine information at different scales for use in a navigation task. We targeted both local cues, where to go on the next step, and more global information, where is the goal located.
+Subjective estimates (slider reports) demonstrated separate encoding for local probability and global probability.
+Objective behaviors (navigational choices) showed both local cues and the global direction influenced choices. 
+Our result, that statistical information has an effect on decision making, is expected. However, our task required participants to combine separate stochastic streams to make their best decisions. It was sufficient, but not optimal, to merely attend to either the probable goal location or the most reliable local cue. We present evidence that people use both sources of information, but non-optimally. In a circumstance where cues conflict the best available strategy is to always pick the cue with the higher reliability. Our participants did not do this. Even when one of the cues was 100\% reliable. Instead we found a bias to use the local cues, especially when the ground truth prior local probability exceeded 80\%.
+
+Our charaterization of the two stochastic streams as having different scales draws on the known anatomical data of distinct spatial representations (\cite{shapiro1997cues}), and the co-opting of spatial representations for mnemonic networks.
+Recent events activate posterior parts of hippocampus whereas information about multiple event pairs activates hippocampal mid-portions. 
+Integrated networks for all event conditions in a narrative task has been shown to activate the anterior hippocampus (\cite{collin2015memory,milivojevic2013mnemonic}).
+\citeauthor{deuker2016event}  (\citeyear{deuker2016event}) showed that both spatial and temporal distance had a significant effect on pattern similarity across all hippocampal grey-matter voxels when the other factors were regressed out. Objects that were close in either space or time shared higher hippocampal pattern similarity. 
+
+Just as people have to navigate the same environment under varying constraints (going to work or going to the store; detours for construction), our task changed the maze structure every trial, but kept its size, rules, and the general relations of local cues and global goals consistent.
+Yet despite the stochastic variability, people were able to successfully navigate this dynamic environment and learn which cues to rely on.
+When either the ground truth prior local probability was fixed (and ground truth prior global probability varied) or whether the ground truth prior local probability varied (and ground truth prior global probability was fixed) our results demonstrated that participants performed much better than chance.
+This is consistent with the idea that we can build powerful mental representations of dynamic noisy inputs and use those representations to make effective decisions.
+One reason for the development of this ability is that multiple scale representations reduce interference for recalling different memories simultaneously \citep{santoro2016memory,o2001conjunctive}.
+Our findings of people's behavioral flexibility might reflect the flexibility of hippocampal codes to remap between orthogonal representations across behavioral contexts \citep{bostock1991experience,leutgeb2004distinct}. 
+
+While we found evidence for the use of both global and local information the local was favored.
+There are multiple potential reasons why we might have found this favored status for local cues.
+One reason could be that participants were more confident about their local probability estimates, because of differences in the variances associated with their local and global estimates.
+Previous research has demonstrated that probabilistic information guides the computation of one’s sense of confidence \citep{geurts2022subjective}.
+The variance of their estimates of local probability was generally lower than the variance of their estimates of global probability.
+Updating global estimates requires a longer term of memory in order to calculate the global probability. Thus, it might be more cognitively demanding for participants to make accurate estimates of global probability.
+Lastly, there is the issue of data quantity. Participants received on average 20 instances of feedback for local cues in one maze but only one instance of feedback concerning exit location. More exposure to local cues could potentially decrease the variance in estimates of local probability. This is just the nature of the local/global levels.
+
+Another reason why participants may have preferred the local cues was feedback proximity.
+The \emph{accuracy} of the local cues was available at each decision-making point.
+The accuracy of the global direction was only confirmed at the end of navigating a maze.
+If participants treat successfully choosing the shortest path direction equivalently rewarding to finding the exit then they would receive more rewards in a maze for correctly selected local choices. 
+It has been known for decades that participants generally prefer rewards now to rewards later. In other words, preference is negatively related to the reward interval length \citep{mischel1962preference}.
+
+
+A difference in the level of difficulty in estimating local and global probability cannot entirely account for the pattern of results. In the Varied Local Fixed Global experiment we showed that even when participants were aware of the 100\% consistent goal direction, they still relied more on the uncertain local cues.
+
+A limitation of these experiments is that when we did vary the global probability we did so in a fairly limited range (63\% to 80\%).
+Our choice of range reflected our difficulty in getting our participants to stay motivated and on task for such a challenging task (navigating repeatedly an essentially invisible environment). 
+Still our range of global probability may not have been sufficiently salient.
+Extending the range of global probability probed (50\% to 100\%) should be explored in additional research.
+Another direction to be explored in future research is the dependence of our findings on maze size.
+We used 11*11 cells mazes to make it possible for participants to solve enough mazes in one experimental session to allow for meaningful statistical comparisons, but humans navigate environments that are much larger physically and take much longer.
+People might integrate information differently depending on spatial scale.
+
+In all our experiments one cue, either local or global, was fairly reliable.
+We tested with local cues that were unreliable, but only when the exit location was 100\% predictable.
+We also tested ground truth prior global probability ranging from 63\% to 80\%, while the ground truth prior local probability were fixed at 80\%. It remains unknown how preference for local and global signals might vary when both cues have poor reliability.
+Starting with a lower local probability (e.g below 80\%) and ramping up the global probability might elucidate whether preferences are blends or whether there is a discrete switch in cue preference after passing a cue reliability difference threshold.
+
+The findings of this study have relevance that extends beyond our contrived invisible maze example. 
+The preference for proximate reward might explain why humans are better at solving complex problem than most RL agents \citep{zhang2020bebold,mnih2015human,burda2018exploration}.
+Humans are more likely to split big tasks into smaller tasks and use intermediate rewards to refine their overall strategy.
+Even if the sub-tasks are not directly related to the general goal, humans might still benefit from using a divide and conquer strategy that leads them to learning about the maze and its contingencies. By correctly identifying subtasks and solving subtasks, human can recombine and transfer learned statistical relationship to novel environments.
+Despite the impressive results using RL in single tasks, RL agents are less efficient at multiple subtasks \citep{vithayathil2020survey}.
+When Key-to-Door tasks are incorporated into maze navigation, RL performance declines significantly as the number of keys it needs to pick up increases \citep{zhang2020bebold}.
+
+Many RL approaches to maze navigation settings only provide rewards if the agent successfully finds the exit.
+No information is provided during exploration.
+The task is simply to find the exit \citep{zhai2022computational, yalnizyan2022forgetting,gym_minigrid}.
+Compare this approach to our task.
+For our maze paradigm participants had to estimate both the local probability and global probability.
+Estimating local probability encouraged orienting to local cues.
+Creating this sub-task might have created a circumstance with more frequent reward events.
+We propose that future studies could provide intermediate sub-tasks to RL agents as a strategy to increase their performance.
+
+The optimal approach to decision making under uncertainty is largely conceived as Bayesian. We seek probability distributions for our environments that minimize the relative entropy (KL-divergence) between our representation and an exact Bayes’ posterior \citep{jirsa2022entropy}.
+However there is considerable debate as to whether humans can achieve this goal.
+Do people in fact rely on this computational strategy or do they merely resemble it in some popular laboratory paradigms?
+We do not understand where and how distinct local and global probability distribution combine to yield a single behavioral decision as required by a Bayesian Inference approach.
+Where neurally are such assignments made and integrated?
+
+Functional imaging recordings while participants performed tasks like our maze task might shed light on the neural mechanisms involved.
+It might also be useful to consider electroencephalogram (EEG) and event-related potential (ERP) as imaging techniques because they would better determine the time scale of activation; which leads, hippocampal or frontal activity?
+
+In conclusion, we found that people are remarkably accurate at estimating and updating local probability and global probability over time in a series of dynamically changing mazes.
+This works sets the stage for a series of future studies probing mental representations of uncertainty about events on a local to global scale as well as human flexibility in stochastically noisy environments.
+
+\subsection{Conflict of interest}
+
+The authors declare that they have no conflict of interest.
+
+
+
+
+\bibliographystyle{apalike}
+ 
+
+\bibliography{uw-ethesis} 
+\addcontentsline{toc}{section}{References}
+
+\newpage
+
+\section{Appendix:}
+
+\end{document}
