@@ -11,6 +11,4 @@ Task Flow
 5. Feedback
 # Demo
 
-### You can read the instruction.html for VGFL and download Maze_task_demo_VGFL.html to play the experiment Varied Global Fixed Local condition.
-### You can read the instruction.html for FGVL and download Maze_task_demo_FGVL.html to play the experiment Fixed Global Varied Local condition.
-
+### You can download the git repo through git clone. Please read the instruction page before you play the demo. 
