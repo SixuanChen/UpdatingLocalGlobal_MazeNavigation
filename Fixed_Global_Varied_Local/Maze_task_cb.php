@@ -1043,6 +1043,7 @@ function MazeGenerate(){
     alert("New Maze has been generated!")
     //console.log("MazeNum!!@@"+MazeNum)
     document.getElementById("consent_checkbox").checked = false;
+    document.getElementById("demo").innerHTML = '';
 }
 
 function mazeStop(){
@@ -1064,7 +1065,7 @@ function checkProbability(){
           
             if (localProbability >=(localpro-5) &&localProbability <=(localpro+5)){
 
-            alert("You estimation of the local probability is close to the ground truth！Within the +/-5% range.")
+            alert("You estimation of the local probability is close to the ground truth. Within the +/-5% range.")
                     localCount ++;
                     localpro = localpro_list[localCount]
                     //console.log("update localpro"+localpro)
@@ -1282,6 +1283,7 @@ function checkExit() {
       
        
 	}
+    return false
 }
 
 // function checkDistance() {
@@ -1377,6 +1379,17 @@ function checkArror() {
 		 setRight = true;	  
 	 }     
 }
+
+function makeWall(c_){
+    if(c_==-30){
+        c_ =10000
+    }
+    else{
+        c_= c_
+        
+    }
+    return c_
+}
 function Guide() {
     checkDistance();
     checkExit();
@@ -1395,10 +1408,19 @@ function Guide() {
     var cur_right_char  = maze_Matrix[maze_size+y_cor][x_cor+1+1];
     var cur_right = cur_right_char.charCodeAt(0);
 
-    var C_up = Math.abs(cur_up-distance);
-    var C_down =Math.abs(cur_down-distance);
-    var C_left =Math.abs(cur_left-distance);
-    var C_right =Math.abs(cur_right-distance);
+    // var C_up = Math.abs(cur_up-distance);
+    // var C_down =Math.abs(cur_down-distance);
+    // var C_left =Math.abs(cur_left-distance);
+    // var C_right =Math.abs(cur_right-distance);
+
+    var C_up = cur_up-distance;
+    var C_down =cur_down-distance;
+    var C_left =cur_left-distance;
+    var C_right =cur_right-distance;
+    C_up =makeWall(C_up)
+    C_down =makeWall(C_down)
+    C_left =makeWall(C_left)
+    C_right =makeWall(C_right)
     var all_dis =[];
 
     all_dis.push(C_up);
@@ -1867,13 +1889,18 @@ init_time = d.getTime();
   
 document.addEventListener('keydown', (event) => {
     if (event.key == 'ArrowRight') {
-        checkCloser()
+       
         player_step= player_step +1;
         maze_step =maze_step+1;
         //console.log(player_step);
         x_cor=x_cor+1;
         player_direction ="R";
         var cur_ = maze_Matrix[maze_size+y_cor][x_cor+1];
+        exit = checkExit()
+        if(exit==false){
+            checkCloser()
+        }
+        
         if(cur_ =='#'){
             x_cor=x_cor-1;
            
@@ -1897,7 +1924,7 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
     if (event.key == 'ArrowLeft') {
-        checkCloser()
+       
         player_step= player_step +1;
         maze_step =maze_step+1;
         //console.log(player_step);
@@ -1905,6 +1932,11 @@ document.addEventListener('keydown', (event) => {
         x_cor=x_cor-1;
 
         var cur_ = maze_Matrix[maze_size+y_cor][x_cor+1];
+        exit = checkExit()
+        if(exit==false){
+            checkCloser()
+        }
+        
         if(cur_ =='#'){
             x_cor=x_cor+1;
            
@@ -1926,7 +1958,7 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
     if (event.key == 'ArrowUp') {
-        checkCloser()
+       
         player_step= player_step +1;
         maze_step =maze_step+1;
         //console.log(player_step);
@@ -1934,6 +1966,11 @@ document.addEventListener('keydown', (event) => {
 
         y_cor=y_cor+1;
         var cur_ = maze_Matrix[maze_size+y_cor][x_cor+1];
+        exit = checkExit()
+        if(exit==false){
+            checkCloser()
+        }
+        
         if(cur_ =='#'){
             y_cor=y_cor-1;
            
@@ -1954,13 +1991,18 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keydown', (event) => {
     if (event.key == 'ArrowDown') {
-        checkCloser()
+       
         player_step= player_step +1;
         maze_step =maze_step+1;
        
         player_direction ="D";
         y_cor=y_cor-1;
         var cur_ = maze_Matrix[maze_size+y_cor][x_cor+1];
+        exit = checkExit()
+        if(exit==false){
+            checkCloser()
+        }
+        
         if(cur_ =='#'){
             y_cor=y_cor+1;
            
