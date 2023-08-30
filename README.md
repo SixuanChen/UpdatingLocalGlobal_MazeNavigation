@@ -1,14 +1,14 @@
 # UpdatingLocalGlobal_MazeNavigation
 
 # Introduction
-You are an explorer who needs to navigate inside this maze. When the task begins, your position will be marked as a green square. The walls of the maze will be hidden from you. To move in the maze you will use the arrow keys. At each choice point the choices available to you (that is those not blocked by hidden walls) will be shown to you by small colored circles. To help you track your progress you will be given feedback after most of your choices to let you know if you are heading in the right direction or not. Please use as few steps as possible to find the exit.
+The present study seeks to understand how mental representations may encode uncertainties in a dynamic environment where information on different scales may align or contradict each other and how individuals integrate cues to make decisions.To address this question, we designed a maze navigation experiment in which participants' decisions could be guided by either local cues or a global goal, both of which could be uncertain. Furthermore, the environment was dynamic, with cue validities varying during navigation. We defined \emph{local} probability as the uncertainty related to events that are physically or temporally proximate, with immediate and direct feedback.\emph{Global}  probability, on the other hand, refers to uncertainty related to events associated with the general objective, requiring a sequence of actions where feedback is distant in space and time.
+There are two versions of this experiment.
 
-Task Flow
-1. Consent Form
-2. Survey
-3. Instruction
-4. Experiment
-5. Feedback
-# Demo
+# Fixed Global Varied Local Experiment
+You can read the instruction about this experiment [here](Maze_FGVL_Instruction.html) and watch a demo video here.
 
-### You can download the git repo through git clone. Please read the instruction page before you play the demo. 
+# Varied Global Fixed Local Experiment
+
+You can read the instruction about this experiment [here](Maze_VGFL_Instruction.html) and watch a demo video here.
+# Get Started
+You can download the git repo through git clone. Please read the instruction page before you play the demo html. 
