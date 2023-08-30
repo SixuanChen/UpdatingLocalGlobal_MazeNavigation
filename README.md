@@ -5,7 +5,7 @@
 There are two versions of this experiment.
 
 # Fixed Global Varied Local Experiment
-You can read the instruction about this experiment [here](Maze_FGVL_Instruction.html) and watch a demo video here.
+You can read the instruction about this experiment [here](https://SixuanChen.github.io/UpdatingLocalGlobal_MazeNavigation/blob/main/Maze_FGVL_Instruction.html) and watch a demo video here.
 
 # Varied Global Fixed Local Experiment
 
